@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/assets/main.css">
+</head>
+<body>
+  <header>
+    <h1>我的个人博客</h1>
+    <nav>
+      <a href="/">首页</a>
+      <a href="/about.html">关于</a>
+    </nav>
+  </header>
+  
+  <main>
+    <!-- 内容将在这里注入 -->
+    {{ content }}
+  </main>
+  
+  <footer>
+    <p>© 2024 我的博客</p>
+  </footer>
+  
+  <script type="module">
+    import { createApp } from 'petite-vue'
+    
+    // 初始化 Petite-Vue
+    createApp({
+      // 可以添加全局状态或方法
+      get currentYear() {
+        return new Date().getFullYear()
+      }
+    }).mount()
+  </script>
+</body>
+</html>
