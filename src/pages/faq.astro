@@ -1,0 +1,8 @@
+---
+import BlogPost from '../layouts/BlogPost.astro';
+const mdx = await import('./blog/faq.mdx');
+const frontmatter = mdx.frontmatter || {};
+const Content = mdx.default;
+---
+
+<BlogPost frontmatter={frontmatter} Content={Content} headings={[]} />

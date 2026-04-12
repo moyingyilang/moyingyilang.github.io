@@ -1,86 +1,99 @@
 ---
-import { Image } from 'astro:assets';
-import type { CollectionEntry } from 'astro:content';
-import BaseHead from '../components/BaseHead.astro';
-import Footer from '../components/Footer.astro';
-import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import BaseHead from '../components/BaseHead.astro';
 
-type Props = CollectionEntry<'blog'>['data'];
-
-const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
+const { frontmatter = {}, headings = [], Content = null } = Astro.props;
 ---
 
-<html lang="en">
-	<head>
-		<BaseHead title={title} description={description} />
-		<style>
-			main {
-				width: calc(100% - 2em);
-				max-width: 100%;
-				margin: 0;
-			}
-			.hero-image {
-				width: 100%;
-			}
-			.hero-image img {
-				display: block;
-				margin: 0 auto;
-				border-radius: 12px;
-				box-shadow: var(--box-shadow);
-			}
-			.prose {
-				width: 720px;
-				max-width: calc(100% - 2em);
-				margin: auto;
-				padding: 1em;
-				color: rgb(var(--gray-dark));
-			}
-			.title {
-				margin-bottom: 1em;
-				padding: 1em 0;
-				text-align: center;
-				line-height: 1;
-			}
-			.title h1 {
-				margin: 0 0 0.5em 0;
-			}
-			.date {
-				margin-bottom: 0.5em;
-				color: rgb(var(--gray));
-			}
-			.last-updated-on {
-				font-style: italic;
-			}
-		</style>
-	</head>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <BaseHead title={frontmatter?.title || '页面'} />
+</head>
+<body>
+  <Header />
+  <div class="post-container">
+    <nav class="toc">
+      <h4>目录</h4>
+      <ul>
+        {headings.map(h => (
+          <li>
+            <a href={`#${h.slug}`}>{h.text}</a>
+          </li>
+        ))}
+      </ul>
+    </nav>
 
-	<body>
-		<Header />
-		<main>
-			<article>
-				<div class="hero-image">
-					{heroImage && <Image width={1020} height={510} src={heroImage} alt="" />}
-				</div>
-				<div class="prose">
-					<div class="title">
-						<div class="date">
-							<FormattedDate date={pubDate} />
-							{
-								updatedDate && (
-									<div class="last-updated-on">
-										Last updated on <FormattedDate date={updatedDate} />
-									</div>
-								)
-							}
-						</div>
-						<h1>{title}</h1>
-						<hr />
-					</div>
-					<slot />
-				</div>
-			</article>
-		</main>
-		<Footer />
-	</body>
+    <article class="post-content">
+      <h1>{frontmatter?.title || '无标题'}</h1>
+      <div class="date">{frontmatter?.date || ''}</div>
+      <!-- 直接渲染Content，修复核心报错 -->
+      {Content && <Content />}
+      
+      <div class="post-nav">
+        {frontmatter?.prev && (
+          <a href={`/${frontmatter.prev}`}>上一篇</a>
+        )}
+        {frontmatter?.next && (
+          <a href={`/${frontmatter.next}`}>下一篇</a>
+        )}
+      </div>
+    </article>
+  </div>
+  <Footer />
+</body>
 </html>
+
+<style>
+.post-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: flex;
+  gap: 2rem;
+}
+.toc {
+  min-width: 220px;
+  position: sticky;
+  top: 2rem;
+  align-self: flex-start;
+}
+.toc ul {
+  list-style: none;
+  padding: 0;
+}
+.toc li {
+  margin: 0.5rem 0;
+}
+.toc a {
+  color: inherit;
+  text-decoration: none;
+}
+.post-content {
+  flex: 1;
+  max-width: 800px;
+}
+.date {
+  color: #888;
+  margin: 0.5rem 0 2rem;
+}
+.post-nav {
+  margin-top: 3rem;
+  display: flex;
+  gap: 1rem;
+}
+.post-nav a {
+  padding: 0.7rem 1rem;
+  background: rgba(255,255,255,.05);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  loading: lazy;
+}
+</style>

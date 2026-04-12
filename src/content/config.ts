@@ -1,11 +1,12 @@
-// src/content/config.ts
 import { defineCollection, z } from 'astro:content';
 
-const docs = defineCollection({
-	type: 'content',
-	schema: z.object({
-		title: z.string(),
-	}),
+const blog = defineCollection({
+  schema: z.object({
+    title: z.string(),
+    date: z.string(),
+    prev: z.string().optional(),
+    next: z.string().optional(),
+  }),
 });
 
-export const collections = { docs };
+export const collections = { blog };

@@ -1,0 +1,16 @@
+---
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <title>{Astro.props.title}</title>
+</head>
+<body>
+  <Header />
+  {Astro.children()}
+  <Footer />
+</body>
+</html>

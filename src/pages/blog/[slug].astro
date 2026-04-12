@@ -1,0 +1,26 @@
+---
+import BlogPost from '../layouts/BlogPost.astro';
+
+// 生成所有页面路径（从 src/pages/blog/ 下的所有 mdx）
+export async function getStaticPaths() {
+  const posts = import.meta.glob('./blog/*.mdx', { eager: true });
+  return Object.entries(posts).map(([file]) => {
+    const slug = file.split('/').at(-1)?.replace('.mdx', '') || '';
+    return { params: { slug } };
+  });
+}
+
+const { slug } = Astro.params;
+
+// 读取 blog 下对应的 MDX
+const post = await import(`./blog/${slug}.mdx`);
+const frontmatter = post.frontmatter || {};
+const Content = post.default;
+---
+
+<!-- 直接渲染布局 + 内容 -->
+<BlogPost
+  frontmatter={frontmatter}
+  headings={[]}
+  Content={Content}
+/>
