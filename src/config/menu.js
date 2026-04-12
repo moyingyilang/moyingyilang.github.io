@@ -1,30 +1,36 @@
 export const MENU_DATA = [
   {
-    label: "🎮 提升FPS材质包",
+    label: "科创",
+    path: "tech",
     children: [
-      { label: "📥 官网下载", href: "/install" },
-      { label: "⚙️ 导入教程", href: "/config" },
-      { label: "❓ 常见问题", href: "/qa" }
+      { label: "物理-电", path: "physics-e" },
+      { label: "物理-力", path: "physics-f" },
+      { label: "化学", path: "chemistry" },
+      { label: "技巧/小知识", path: "tips" }
     ]
   },
   {
-    label: "🏰 ESS服务器文档",
+    label: "代码",
+    path: "code",
     children: [
-      { label: "🛠️ 服务器搭建", href: "/setup" },
-      { label: "🔌 插件配置", href: "/plugins" },
-      { label: "🔧 维护指南", href: "/maintenance" }
+      { label: "容器", path: "container" },
+      { label: "开发语言", path: "language" },
+      { label: "开发环境", path: "env" }
     ]
   },
   {
-    label: "⛓ 工具链接",
+    label: "小知识/随笔",
+    path: "notes",
     children: [
-      { label: "UUID生成", href: "/UUID/" },
-      { label: "旋转头像", href: "/xztx/" },
-      { label: "玩家令牌", href: "/player/" },
-      { label: "ESS服务器", href: "/ess/" },
-      { label: "网盘", href: "/pan/" },
-      { label: "网盘[壳](2.0)", href: "/KenRun/" }
+      { label: "开发者目前研究项目", path: "dev-projects" },
+      { label: "项目往事及进度", path: "project-history" },
+      { label: "部分游戏总结的攻略", path: "game-guides" },
+      { label: "pcb设计和电路原理等", path: "pcb" },
+      { label: "刷机圈小瓜", path: "flash-gossip" },
+      { label: "git项目监控引擎", path: "git-monitor" }
     ]
   },
-  { label: "❓ 常见问题汇总", href: "/faq" }
+  { label: "杂项工具", path: "tools" },
+  { label: "常见问题", path: "faq" },
+  { label: "关于", path: "about" }
 ];

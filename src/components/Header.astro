@@ -17,13 +17,30 @@ import { MENU_DATA } from '../config/menu.js';
 
 <aside class="sidebar" id="sidebar">
   <nav class="sidebar-nav">
-    {MENU_DATA.map(item => (
-      <li class="has-submenu">
-        <a href="#">{item.label}</a>
+    {MENU_DATA.map((item) => (
+      <li class={item.children ? 'has-submenu' : ''}>
+        {item.children
+          ? <a href="#">{item.label}</a>
+          : <HeaderLink href={`/${item.path}`}>{item.label}</HeaderLink>
+        }
         {item.children && (
           <ul class="submenu">
-            {item.children.map(child => (
-              <li><HeaderLink href={child.href}>{child.label}</HeaderLink></li>
+            {item.children.map((child) => (
+              <li class={child.children ? 'has-submenu' : ''}>
+                {child.children
+                  ? <a href="#">{child.label}</a>
+                  : <HeaderLink href={`/${item.path}/${child.path}`}>{child.label}</HeaderLink>
+                }
+                {child.children && (
+                  <ul class="submenu">
+                    {child.children.map((sub) => (
+                      <li>
+                        <HeaderLink href={`/${item.path}/${child.path}/${sub.path}`}>{sub.label}</HeaderLink>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
             ))}
           </ul>
         )}
