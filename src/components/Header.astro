@@ -1,79 +1,48 @@
 ---
 import { SITE_TITLE } from '../consts';
 import HeaderLink from './HeaderLink.astro';
-import { getDocMenuTree } from '../utils/getMenuTree';
-
-// 🔥 自动读取文件夹生成多级菜单
-const menuTree = await getDocMenuTree();
+import { MENU_DATA } from '../config/menu.js';
 ---
 
-<!-- 顶部导航：左侧汉堡 + 右侧标题 -->
 <header class="navbar">
   <div class="navbar-content">
-    <!-- 原版汉堡按钮（动画1:1保留） -->
     <button class="menu-toggle" id="menuToggle" aria-label="菜单开关">
       <span></span>
       <span></span>
       <span></span>
     </button>
-    <!-- 标题（不硬编码） -->
     <a href="/" class="logo">{SITE_TITLE}</a>
   </div>
 </header>
 
-<!-- 自动生成多级侧边栏菜单 -->
 <aside class="sidebar" id="sidebar">
   <nav class="sidebar-nav">
-    <!-- 递归渲染多级菜单 -->
-    {menuTree.map((item) => (
-      <Fragment>
-        {item.children ? (
-          <!-- 有子菜单：折叠父菜单 -->
-          <li class="has-submenu">
-            <a href="#">{item.label}</a>
-            <ul class="submenu">
-              {item.children.map((child) => (
-                <Fragment>
-                  {child.children ? (
-                    <!-- 二级菜单 -->
-                    <li class="has-submenu">
-                      <a href="#">{child.label}</a>
-                      <ul class="submenu">
-                        {child.children.map((sub) => (
-                          <li><HeaderLink href={sub.href}>{sub.label}</HeaderLink></li>
-                        ))}
-                      </ul>
-                    </li>
-                  ) : (
-                    <li><HeaderLink href={child.href}>{child.label}</HeaderLink></li>
-                  )}
-                </Fragment>
-              ))}
-            </ul>
-          </li>
-        ) : (
-          <!-- 无子女：直接链接 -->
-          <li><HeaderLink href={item.href}>{item.label}</HeaderLink></li>
+    {MENU_DATA.map(item => (
+      <li class="has-submenu">
+        <a href="#">{item.label}</a>
+        {item.children && (
+          <ul class="submenu">
+            {item.children.map(child => (
+              <li><HeaderLink href={child.href}>{child.label}</HeaderLink></li>
+            ))}
+          </ul>
         )}
-      </Fragment>
+      </li>
     ))}
   </nav>
 </aside>
 
 <script>
-// 原版汉堡动画 + 菜单折叠交互
 document.addEventListener('DOMContentLoaded', () => {
   const menuToggle = document.getElementById('menuToggle');
   const sidebar = document.getElementById('sidebar');
   const submenuToggles = document.querySelectorAll('.has-submenu > a');
 
-  // 汉堡切换
   menuToggle.addEventListener('click', () => {
     menuToggle.classList.toggle('active');
     sidebar.classList.toggle('active');
   });
 
-  // 多级菜单折叠
   submenuToggles.forEach(toggle => {
     toggle.addEventListener('click', (e) => {
       e.preventDefault();
@@ -84,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <style>
-/* 完全保留你原来的样式 + 适配自动菜单 */
 .navbar {
   background: #2c3e50;
   padding: 1rem 1.5rem;
@@ -104,8 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
   font-size: 1.5rem;
   text-decoration: none;
 }
-
-/* 原版汉堡动画（100%保留） */
 .menu-toggle {
   background: none;
   border: none;
@@ -126,15 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
 .menu-toggle span:nth-child(1) { top: 10px; }
 .menu-toggle span:nth-child(2) { top: 16px; }
 .menu-toggle span:nth-child(3) { top: 22px; }
-.menu-toggle.active span:nth-child(1) {
-  transform: translate(-50%, 6px) rotate(45deg);
-}
+.menu-toggle.active span:nth-child(1) { transform: translate(-50%, 6px) rotate(45deg); }
 .menu-toggle.active span:nth-child(2) { opacity: 0; }
-.menu-toggle.active span:nth-child(3) {
-  transform: translate(-50%, -6px) rotate(-45deg);
-}
-
-/* 侧边栏 + 多级菜单样式 */
+.menu-toggle.active span:nth-child(3) { transform: translate(-50%, -6px) rotate(-45deg); }
 .sidebar {
   position: fixed;
   top: 65px;
@@ -158,21 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
   display: block;
   border-radius: 4px;
 }
-.has-submenu > a::after {
-  content: "▸";
-  float: right;
-  transition: transform 0.3s;
-}
+.has-submenu > a::after { content: "▸"; float: right; transition: transform 0.3s; }
 .has-submenu.active > a::after { transform: rotate(90deg); }
-.submenu {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s;
-  padding-left: 1rem;
-}
+.submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s; padding-left: 1rem; }
 .has-submenu.active .submenu { max-height: 500px; }
-
-/* 移动端适配 */
 @media (min-width: 992px) {
   .sidebar { transform: translateX(0); }
   .menu-toggle { display: none; }
