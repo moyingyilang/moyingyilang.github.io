@@ -1,8 +1,24 @@
 ---
-import BlogPost from '../layouts/BlogPost.astro';
-const mdx = await import('./blog/faq.mdx');
-const frontmatter = mdx.frontmatter || {};
-const Content = mdx.default;
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import BaseHead from '../components/BaseHead.astro';
 ---
 
-<BlogPost frontmatter={frontmatter} Content={Content} headings={[]} />
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <BaseHead title="常见问题" />
+</head>
+<body>
+  <Header />
+
+  <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
+    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">常见问题</h1>
+    <div style="line-height:1.8; font-size:1rem; color:#eee;">
+      <p>在这里写你的常见问题内容。</p>
+    </div>
+  </main>
+
+  <Footer />
+</body>
+</html>

@@ -1,26 +1,43 @@
 ---
-import BlogPost from '../layouts/BlogPost.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import BaseHead from '../../components/BaseHead.astro';
 
-// 生成所有页面路径（从 src/pages/blog/ 下的所有 mdx）
-export async function getStaticPaths() {
-  const posts = import.meta.glob('./blog/*.mdx', { eager: true });
-  return Object.entries(posts).map(([file]) => {
-    const slug = file.split('/').at(-1)?.replace('.mdx', '') || '';
-    return { params: { slug } };
-  });
+const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
+  .map(([f, mod]) => ({
+    slug: f.split('/').pop()?.replace(/\.mdx$/,''),
+    ...mod.frontmatter
+  }));
+
+export function getStaticPaths() {
+  return posts.map(post => ({
+    params: { slug: post.slug }
+  }));
 }
 
 const { slug } = Astro.params;
-
-// 读取 blog 下对应的 MDX
-const post = await import(`./blog/${slug}.mdx`);
-const frontmatter = post.frontmatter || {};
-const Content = post.default;
+const post = posts.find(p => p.slug === slug);
 ---
 
-<!-- 直接渲染布局 + 内容 -->
-<BlogPost
-  frontmatter={frontmatter}
-  headings={[]}
-  Content={Content}
-/>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <BaseHead title={post?.title || '文章'} />
+</head>
+<body>
+  <Header />
+
+  <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
+    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">{post?.title || '文章不存在'}</h1>
+    <div style="line-height:1.8; font-size:1rem; color:#eee;">
+      {post ? (
+        <Fragment set:html={post.compiledContent || ''} />
+      ) : (
+        <p>文章未找到</p>
+      )}
+    </div>
+  </main>
+
+  <Footer />
+</body>
+</html>
