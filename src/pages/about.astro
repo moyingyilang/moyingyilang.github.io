@@ -1,13 +1,44 @@
 ---
-import BlogPost from '../layouts/BlogPost.astro';
-// 正确导入MDX
-const mdx = await import('./blog/about.mdx');
-const frontmatter = mdx.frontmatter || {};
-const Content = mdx.default;
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import BaseHead from '../components/BaseHead.astro';
 ---
 
-<BlogPost 
-  frontmatter={frontmatter} 
-  Content={Content} 
-  headings={[]}
-/>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <BaseHead title="关于本站" />
+  <style>
+    /* 🔥 强制 About 页面为单列，杜绝任何奇怪的浮动布局 */
+    .about-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 1rem;
+      box-sizing: border-box;
+    }
+    .about-title {
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      font-weight: bold;
+      margin: 0 0 2rem;
+      color: #000;
+    }
+    .about-content {
+      font-size: 1.1rem;
+      line-height: 1.8;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <Header />
+
+  <main class="about-page">
+    <h1 class="about-title">关于本站</h1>
+    <div class="about-content">
+      <p>这里写你的关于页面内容。</p>
+      </div>
+  </main>
+
+  <Footer />
+</body>
+</html>
