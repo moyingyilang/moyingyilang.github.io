@@ -3,17 +3,23 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import BaseHead from '../../components/BaseHead.astro';
 
-const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
-  .map(([f, mod]) => ({
-    slug: f.split('/').pop()?.replace(/\.mdx$/,''),
-    ...mod.frontmatter
-  }));
-
 export function getStaticPaths() {
+  const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
+    .map(([f, mod]) => ({
+      slug: f.split('/').pop()?.replace(/\.mdx$/, ''),
+    }));
+
   return posts.map(post => ({
     params: { slug: post.slug }
   }));
 }
+
+const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
+  .map(([f, mod]) => ({
+    slug: f.split('/').pop()?.replace(/\.mdx$/, ''),
+    ...mod.frontmatter,
+    compiledContent: mod.compiledContent,
+  }));
 
 const { slug } = Astro.params;
 const post = posts.find(p => p.slug === slug);
@@ -28,7 +34,9 @@ const post = posts.find(p => p.slug === slug);
   <Header />
 
   <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
-    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">{post?.title || '文章不存在'}</h1>
+    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">
+      {post?.title || '文章不存在'}
+    </h1>
     <div style="line-height:1.8; font-size:1rem; color:#eee;">
       {post ? (
         <Fragment set:html={post.compiledContent || ''} />

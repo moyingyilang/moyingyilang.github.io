@@ -6,19 +6,19 @@ import { MENU_DATA } from '../../config/menu.js';
 
 export const prerender = true;
 
-function getAllPaths(menu, parentPath = '') {
-  let paths = [];
-  for (const item of menu) {
-    const fullPath = parentPath ? `${parentPath}/${item.path}` : item.path;
-    paths.push(fullPath);
-    if (item.children?.length) {
-      paths = paths.concat(getAllPaths(item.children, fullPath));
-    }
-  }
-  return paths;
-}
-
 export async function getStaticPaths() {
+  function getAllPaths(menu, parentPath = '') {
+    let paths = [];
+    for (const item of menu) {
+      const fullPath = parentPath ? `${parentPath}/${item.path}` : item.path;
+      paths.push(fullPath);
+      if (item.children?.length) {
+        paths = paths.concat(getAllPaths(item.children, fullPath));
+      }
+    }
+    return paths;
+  }
+
   const allPaths = getAllPaths(MENU_DATA);
   return allPaths.map(path => ({ params: { category: path } }));
 }
