@@ -1,6 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE_AUTHOR, SITE_DESCRIPTION, SITE_TITLE, SOCIAL_LINKS } from '../consts';
+import {
+	AI_CONTRIBUTION,
+	LICENSE,
+	REPO_URL,
+	SITE_AUTHOR,
+	SITE_COPYRIGHT_YEAR,
+	SITE_DESCRIPTION,
+	SITE_TITLE,
+	SOCIAL_LINKS,
+} from '../consts';
 
 const STACK = [
 	{ label: '框架', value: 'Astro 6（静态输出）' },
@@ -10,6 +19,10 @@ const STACK = [
 	{ label: '交互', value: '浅色 / 深色切换、命令面板搜索' },
 	{ label: '部署', value: 'GitHub Pages' },
 ];
+
+const thisYear = new Date().getFullYear();
+const copyrightYears =
+	thisYear > SITE_COPYRIGHT_YEAR ? `${SITE_COPYRIGHT_YEAR}–${thisYear}` : String(SITE_COPYRIGHT_YEAR);
 ---
 
 <BaseLayout title="关于" description={SITE_DESCRIPTION}>
@@ -74,7 +87,51 @@ const STACK = [
 		</div>
 	</section>
 
-	<p class="muted about-foot">&copy; {new Date().getFullYear()} {SITE_AUTHOR}</p>
+	<section class="stack">
+		<h2 class="section-heading">许可与参与</h2>
+
+		<div class="card card--pad reveal">
+			<div class="prose">
+				<h3>开源许可</h3>
+				<p>
+					本站代码以 <a href={LICENSE.url} target="_blank" rel="noopener noreferrer">{LICENSE.name}</a>
+					（<code>{LICENSE.id}</code>）授权，完整条款见仓库根目录的 <code>{LICENSE.file}</code> 文件。
+					这是常见开源许可里约束最强的一种：衍生作品必须同样以 AGPL 开放；
+					第 13 条还明确规定，若把修改后的版本作为网络服务提供，必须向使用者提供对应源码。
+				</p>
+				<p>
+					需要留意：许可证覆盖的是本站的<strong>代码与站主原创内容</strong>。
+					壁纸功能以外链方式引用第三方图片（游戏素材、Bing 每日壁纸、二次元图源），
+					这些图片的版权属于各自权利人，不在本站许可范围内，本站也没有再分发它们。
+				</p>
+
+				<h3>AI 参与声明</h3>
+				<p>{AI_CONTRIBUTION.summary}</p>
+				<ul>
+					{AI_CONTRIBUTION.items.map((item) => (
+						<li>{item}</li>
+					))}
+				</ul>
+				<p class="muted">
+					参与形式：{AI_CONTRIBUTION.assistant}（模型 {AI_CONTRIBUTION.model}），
+					担任{AI_CONTRIBUTION.role}。{AI_CONTRIBUTION.disclaimer}
+				</p>
+			</div>
+		</div>
+
+		<div class="card reveal">
+			<div class="row">
+				<a class="btn" href={REPO_URL} target="_blank" rel="noopener noreferrer">查看源码仓库</a>
+				<a class="btn btn--ghost" href={LICENSE.url} target="_blank" rel="noopener noreferrer">
+					许可证全文
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<p class="muted about-foot">
+		&copy; {copyrightYears} {SITE_AUTHOR} · 代码以 {LICENSE.shortName} 授权
+	</p>
 </BaseLayout>
 
 <style>

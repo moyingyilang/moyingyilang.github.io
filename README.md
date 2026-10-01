@@ -221,3 +221,62 @@ CI 用 `withastro/action@v3`，它内部的 `pnpm/action-setup` 会在
 - 代码高亮为 Shiki 双主题，随 `<html data-theme>` 自动切换。
 - 内容集合只保留一份 `src/content.config.ts`；旧版 `src/content/config.ts`
   与失效的 `BlogPost.astro` / `HeaderLink.astro` / `FormattedDate.astro` 均已删除。
+
+## 许可
+
+本站代码以 **GNU Affero General Public License v3.0**（`AGPL-3.0-only`）授权，
+完整条款见 [LICENSE](./LICENSE)（与 gnu.org 官方原文逐字节一致）。
+
+选择 `AGPL-3.0-only` 而非 `-or-later` 是刻意的：前者不允许被许可方自行套用未来的新版条款，
+是常见开源许可里约束最强的一种。要点：
+
+- 衍生作品必须以同样的 AGPL 条款开放
+- **第 13 条（Remote Network Interaction）**：若你把修改后的版本作为网络服务提供，
+  必须向使用者提供对应源码
+- 必须保留版权声明与许可声明，且不得附加额外限制
+
+`package.json` 的 `license` 字段同步为 `AGPL-3.0-only`；
+页脚与「关于」页都标注了许可，页脚不再写「保留所有权利」（那与许可证相矛盾）。
+
+### 第三方内容不在许可范围内
+
+许可证覆盖的是**本站代码与站主原创内容**。以下内容版权属于各自权利人，本站不再分发它们：
+
+| 内容 | 来源 | 说明 |
+| --- | --- | --- |
+| 壁纸图片 | Bing 每日壁纸、`t.alcy.cc` / `t.mwm.moe` 等二次元图源 | 由浏览器**外链**拉取，仓库内只有 URL 清单 |
+| 游戏图集 | 蔚蓝档案、明日方舟、碧蓝航线的素材仓库（经 jsDelivr 分发） | 同上，`wallpaper-manifest.json` 只存 URL |
+| 游戏素材版权 | 各游戏开发商 / 发行商 | 仅作个人站点的壁纸展示，不得商用 |
+| 图标 | GitHub、哔哩哔哩、酷安 的官方图标 | 仅用于链接到对应平台 |
+
+若你要把本站用于商业用途，请先自行确认这些第三方素材的授权状况。
+
+## AI 参与声明
+
+本站的**视觉系统、壁纸系统与工程维护**部分由 AI 编程助手协作完成：
+
+- Fluent (Windows 11 Acrylic / Mica) × MIUI 毛玻璃设计系统：设计令牌、玻璃组件、深浅色双主题
+- 顶栏、侧边导航树、页脚与正文排版的重构
+- 可调壁纸系统：五种来源模式、设置面板、游戏图集清单生成脚本
+- 内容集合与路由修复、命令面板搜索、图片灯箱、回到顶部等交互
+- 维护脚本（产物校验、图源失效检测）与依赖、CI 配置排查
+
+参与形式：**DeepSeek Harness**（模型 `deepseek-flash`），担任 AI 编程助手。
+选题、内容与最终取舍由站主决定并负责；AI 生成或修改的代码已尽力测试，但不提供任何担保。
+
+声明数据集中在 [`src/consts.ts`](./src/consts.ts) 的 `AI_CONTRIBUTION`，
+改这一处即可同时更新「关于」页与页脚，不必去翻各个组件。
+
+### 让 git 历史也记录这一参与
+
+GitHub **协作者**无法由 AI 自行添加（AI 没有 GitHub 账号，也无法接受邀请）。
+若希望提交记录里也能体现，可以在 commit message 末尾加 trailer：
+
+```text
+feat: 壁纸系统支持五种来源模式
+
+Co-Authored-By: DeepSeek Harness <noreply@deepseek.com>
+```
+
+GitHub 会把带 `Co-Authored-By` 的提交在提交页显示为双作者。
+也可以建一个 `CONTRIBUTORS.md`，或在某个提交上打 `Assisted-by:` trailer（非标准但可读）。

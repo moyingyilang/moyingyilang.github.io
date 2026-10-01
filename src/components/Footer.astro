@@ -1,5 +1,5 @@
 ---
-import { SITE_AUTHOR } from '../consts';
+import { LICENSE, REPO_URL, SITE_AUTHOR } from '../consts';
 
 const year = new Date().getFullYear();
 
@@ -26,8 +26,20 @@ const LINKS = [
 <footer class="site-footer">
 	<div class="site-footer__inner">
 		<div class="site-footer__text">
-			<p class="site-footer__copy">&copy; {year} {SITE_AUTHOR} · 保留所有权利</p>
-			<p class="site-footer__meta">基于 Astro 构建 · Fluent × MIUI 玻璃视觉</p>
+			{/*
+				注意：不要在采用 AGPL 之后再写「保留所有权利」——
+				那与许可证授予的权利相矛盾。
+			*/}
+			<p class="site-footer__copy">
+				&copy; {year} {SITE_AUTHOR} · 代码以
+				<a href={`${REPO_URL}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">
+					{LICENSE.shortName}
+				</a>
+				授权
+			</p>
+			<p class="site-footer__meta">
+				基于 Astro 构建 · Fluent × MIUI 玻璃视觉 · <a href="/about">视觉与工程由 AI 协作完成</a>
+			</p>
 		</div>
 		<div class="site-footer__icons">
 			{
@@ -56,6 +68,20 @@ const LINKS = [
 
 	.site-footer__copy {
 		margin: 0;
+	}
+
+	.site-footer__copy a,
+	.site-footer__meta a {
+		color: inherit;
+		text-decoration: underline;
+		text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+		text-underline-offset: 3px;
+	}
+
+	.site-footer__copy a:hover,
+	.site-footer__meta a:hover {
+		color: var(--accent);
+		text-decoration-color: var(--accent);
 	}
 
 	.site-footer__meta {
