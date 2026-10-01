@@ -192,6 +192,24 @@ export function findNodeByLeaf(segment, items = MENU_DATA) {
 }
 
 /**
+ * 取某个分类所属的上一级分组名（例如 circuits → 电气工程）。
+ * 顶层分类没有父分组，返回 null。
+ *
+ * 用于「相关文章」：同属一个大类的文章比毫无关系的更值得互相推荐。
+ */
+export function parentLabelOfLeaf(segment, items = MENU_DATA) {
+	const nodes = flattenMenu(items);
+	const node = nodes.find((n) => n.path === segment);
+	if (!node) return null;
+
+	const segments = node.href.split('/').filter(Boolean);
+	if (segments.length < 2) return null;
+
+	const parentHref = `/${segments.slice(0, -1).join('/')}`;
+	return nodes.find((n) => n.href === parentHref)?.label ?? null;
+}
+
+/**
  * 需要由 [...category] 兜底路由生成的分类路径。
  * 已有独立页面的节点（dedicated）被排除，避免路由冲突。
  */

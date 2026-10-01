@@ -1,12 +1,14 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
+import { formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
+import { groupByCategory } from '../../utils/nav';
 
 const posts = await getSortedPosts();
+const groups = await groupByCategory(posts);
 const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 ---
 
-<BaseLayout title="文章列表" description="全部文章按发布时间倒序归档。">
+<BaseLayout title="文章列表" description="全部文章按分类归集，组内按发布时间倒序。">
 	<nav class="breadcrumbs" aria-label="面包屑">
 		<a href="/">首页</a>
 		<span class="sep" aria-hidden="true">/</span>
@@ -16,35 +18,43 @@ const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 	<div class="page-head">
 		<h1 class="page-title">文章列表</h1>
 		<p class="page-desc">
-			共 {posts.length} 篇文章、{tagCount} 个标签，按发布时间倒序排列。
+			共 {posts.length} 篇文章、{groups.length} 个分类、{tagCount} 个标签。
+			按分类归集，组内按发布时间倒序。
 		</p>
 	</div>
 
 	{
 		posts.length > 0 ? (
-			<div class="stack">
-				{posts.map((post, index) => {
-					const cat = categoryOf(post);
-					return (
-						<a
-							class="card reveal"
-							href={postHref(post)}
-							style={`transition-delay:${Math.min(index * 40, 200)}ms`}
-						>
-							<span class="card__arrow">→</span>
-							<h2 class="card__title">{post.data.title}</h2>
-							{post.data.description && <p class="card__desc">{post.data.description}</p>}
-							<p class="card__meta">
-								{cat && <span class="badge">{cat.label}</span>}
-								<span>{formatDate(post.data.date ?? post.data.pubDate)}</span>
-								<span>· {readingTime(post.body)}</span>
-								{(post.data.tags ?? []).map((tag) => (
-									<span class="badge badge--muted">{tag}</span>
-								))}
-							</p>
-						</a>
-					);
-				})}
+			<div class="post-groups">
+				{groups.map((group) => (
+					<section class="post-group">
+						<h2 class="section-heading post-group__head">
+							{group.href ? <a href={group.href}>{group.label}</a> : group.label}
+							<span class="post-group__count">{group.posts.length} 篇</span>
+						</h2>
+
+						<div class="stack">
+							{group.posts.map((post, index) => (
+								<a
+									class="card reveal"
+									href={postHref(post)}
+									style={`transition-delay:${Math.min(index * 40, 200)}ms`}
+								>
+									<span class="card__arrow">→</span>
+									<h3 class="card__title">{post.data.title}</h3>
+									{post.data.description && <p class="card__desc">{post.data.description}</p>}
+									<p class="card__meta">
+										<span>{formatDate(post.data.date ?? post.data.pubDate)}</span>
+										<span>· {readingTime(post.body)}</span>
+										{(post.data.tags ?? []).map((tag) => (
+											<span class="badge badge--muted">{tag}</span>
+										))}
+									</p>
+								</a>
+							))}
+						</div>
+					</section>
+				))}
 			</div>
 		) : (
 			<div class="empty-state">
@@ -54,3 +64,39 @@ const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 		)
 	}
 </BaseLayout>
+
+<style>
+	/* 分组之间留出明显间距，组内用全局 .stack 的 0.8rem */
+	.post-groups {
+		display: flex;
+		flex-direction: column;
+		gap: 2.4rem;
+	}
+
+	.post-group {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	/* 复用全局 .section-heading 的强调条，只在计数与链接上做补充 */
+	.post-group__head {
+		justify-content: flex-start;
+	}
+
+	.post-group__head a {
+		color: inherit;
+	}
+
+	.post-group__head a:hover {
+		color: var(--accent);
+	}
+
+	.post-group__count {
+		margin-left: auto;
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 450;
+		color: var(--text-tertiary);
+	}
+</style>

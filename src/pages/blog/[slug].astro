@@ -1,7 +1,14 @@
 ---
 import { render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
+import {
+	categoryOf,
+	formatDate,
+	getSortedPosts,
+	postHref,
+	readingTime,
+	relatedPosts,
+} from '../../utils/posts';
 
 export async function getStaticPaths() {
 	const posts = await getSortedPosts();
@@ -22,6 +29,9 @@ const { Content, headings } = await render(post);
 const cat = categoryOf(post);
 const date = post.data.date ?? post.data.pubDate;
 const tags = post.data.tags ?? [];
+
+// 同分类或共同标签的文章：本站是文档站，横向跳转比时间线更有用
+const related = relatedPosts(post, await getSortedPosts(), 3);
 ---
 
 <BaseLayout
@@ -92,6 +102,23 @@ const tags = post.data.tags ?? [];
 			</nav>
 		)
 	}
+
+	{
+		related.length > 0 && (
+			<section class="related">
+				<h2 class="section-heading">相关文章</h2>
+				<div class="grid grid--auto">
+					{related.map((item) => (
+						<a class="card reveal" href={postHref(item)}>
+							<span class="card__arrow">→</span>
+							<h3 class="card__title">{item.data.title}</h3>
+							{item.data.description && <p class="card__desc">{item.data.description}</p>}
+						</a>
+					))}
+				</div>
+			</section>
+		)
+	}
 </BaseLayout>
 
 <style>
@@ -138,5 +165,11 @@ const tags = post.data.tags ?? [];
 	.post-nav__title {
 		font-weight: 550;
 		color: var(--text);
+	}
+
+	.related {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 	}
 </style>
