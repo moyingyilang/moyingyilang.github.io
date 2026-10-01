@@ -48,8 +48,42 @@ export interface GameEntry {
 /* --------------------------------------------------------------------------
    Bing
    实测：bing.biturl.top 返回 200 JSON，CORS 为 *（带 Origin 与 OPTIONS 预检均通过），
-   index=random 每次返回不同图；resolution=1920 约 337KB，3840 高达 3.7MB 故不使用。
+   index=random 每次返回不同图。
+
+   注意 API 自身的 resolution 参数**只认横屏**：
+     resolution=1920 -> 1920x1080    resolution=1366 -> 1366x768
+     resolution=1080 -> HTTP 502     resolution=768  -> HTTP 502
+   后两个竖屏档位是坏的。但返回的图片落在 Bing 自己的 CDN 上，而 CDN 是
+   **按文件名里的尺寸出图**的，所以竖图靠改写 URL 里的尺寸段来拿，不走 API 参数。
+
+   BING_SIZES 是逐个实测的结果，只有这四档可用；
+   2560x1440 / 3840x2160 / 1080x2400 / 1440x2560 / 1200x1920 等一律 404。
    -------------------------------------------------------------------------- */
+export const BING_SIZES = {
+	landscape: { large: '1920x1080', small: '1366x768' },
+	portrait: { large: '1080x1920', small: '768x1366' },
+} as const;
+
+/**
+ * 按屏幕方向与实际像素需求挑一档。
+ *
+ * 竖屏下横图会被 cover 裁掉大半、白白浪费像素，所以方向是首要判据；
+ * 再按设备像素宽度决定用大档还是小档，小屏不必下 337KB。
+ */
+export function pickBingSize(viewportWidth: number, viewportHeight: number, dpr = 1) {
+	const portrait = viewportHeight > viewportWidth;
+	const ratio = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+	const need = Math.round(viewportWidth * ratio);
+	const table = portrait ? BING_SIZES.portrait : BING_SIZES.landscape;
+	const threshold = portrait ? 800 : 1400;
+	return need <= threshold ? table.small : table.large;
+}
+
+/** 把 Bing 图片地址里的尺寸段换成目标尺寸；地址里没有尺寸段时原样返回 */
+export function withBingSize(url: string, size: string) {
+	return url.replace(/_\d+x\d+(\.(?:jpe?g|png|webp))(\?|$)/i, `_${size}$1$2`);
+}
+
 export const BING_SOURCES: WallpaperSource[] = [
 	{
 		id: 'bing-biturl',
@@ -57,7 +91,7 @@ export const BING_SOURCES: WallpaperSource[] = [
 		kind: 'json',
 		url: 'https://bing.biturl.top/?resolution=1920&format=json&index=random&mkt=zh-CN',
 		pick: 'url',
-		verified: '200 JSON，CORS *，index=random 每次不同图',
+		verified: '200 JSON，CORS *，index=random 每次不同图；出图尺寸由 CDN 文件名决定',
 	},
 ];
 

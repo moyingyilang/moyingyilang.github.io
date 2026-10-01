@@ -86,6 +86,13 @@ const SITE_GROUPS = [
 				action: 'shuffle',
 				badge: '随机',
 			},
+			{
+				title: '我只想看壁纸',
+				desc: '全屏只看当前壁纸，右下角可上一张／下一张与下载，Esc 退出。',
+				href: '#',
+				action: 'viewer',
+				badge: '全屏',
+			},
 		],
 	},
 ];
@@ -582,6 +589,7 @@ const siteTotal = SITE_GROUPS.reduce((sum, group) => sum + group.items.length, 0
 		settings: 'settingsOpen',
 		theme: 'themeToggle',
 		shuffle: 'wallpaperShuffle',
+		viewer: 'wpViewerOpen',
 	};
 
 	for (const card of document.querySelectorAll('[data-site-action]')) {
