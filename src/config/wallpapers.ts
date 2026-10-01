@@ -289,7 +289,27 @@ export const DEFAULT_SETTINGS = {
 	lastUrl: '',
 	/** 上一次的来源说明 */
 	lastCredit: '',
+
+	/*
+	 * 第三方接口的克制使用
+	 *
+	 * 本站是纯静态站、没有后端，**无法阻止**任何人把接口地址抄走直接调用。
+	 * 能做的是不让自己成为放大器：把已经取到的图片地址缓存在本地轮换使用，
+	 * 攒够一批之后每轮只再请求一次，换图就不会持续打对方接口。
+	 * 跨天允许重新取一张，保留「Bing 每日壁纸」本身的意义。
+	 */
+	bingUrls: [] as string[],
+	bingCursor: 0,
+	/** 缓存所属日期（YYYY-MM-DD） */
+	bingDay: '',
 };
+
+/** 本地缓存至少攒到这个条数，才停止为「换图」而请求接口 */
+export const BING_CACHE_MIN = 4;
+/** 本地缓存的条数上限 */
+export const BING_CACHE_MAX = 8;
+/** 两次手动换图之间的最短间隔（毫秒）：连点或脚本连点都不会持续打接口 */
+export const SHUFFLE_COOLDOWN = 1200;
 
 export const SETTINGS_STORAGE_KEY = 'moying-wallpaper';
 export const MANIFEST_URL = '/wallpaper-manifest.json';

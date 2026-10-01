@@ -206,6 +206,13 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 						注意：碧蓝航线皮肤立绘目录（<code>images/skins</code>）擦边内容风险较高，已刻意排除；
 						其余图集为游戏场景与剧情素材。这些图源均为第三方，可用性不由本站保证。
 					</p>
+					<p>
+						<strong>对第三方接口的克制使用</strong>：本站不靠这些接口盈利，也不希望它们
+						被本站的访问量拖累。已做的三件事 —— 换图有最短间隔（连点不会持续打接口）；
+						取到的图片地址缓存到本地轮换，攒够一批后每轮只再请求一次、跨天才重新取；
+						图集类来源在构建期就已固化直链，运行期完全不碰对方接口。
+						如果你要写脚本批量抓取，请直接去支持这些服务本身，不要经由本站。
+					</p>
 				</div>
 			</details>
 		</div>
@@ -242,7 +249,13 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 <script type="application/json" id="wallpaper-config" set:html={configJson} />
 
 <script>
-	import { pickBingSize, withBingSize } from '../config/wallpapers';
+	import {
+		BING_CACHE_MAX,
+		BING_CACHE_MIN,
+		SHUFFLE_COOLDOWN,
+		pickBingSize,
+		withBingSize,
+	} from '../config/wallpapers';
 
 	const configEl = document.getElementById('wallpaper-config');
 	if (configEl) {
@@ -331,14 +344,58 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 
 			if (source.kind === 'image') return bust(source.url);
 
-			const response = await fetch(bust(source.url), { cache: 'no-store' });
-			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const data = await response.json();
-			const url = safeUrl(pickByPath(data, source.pick));
-			if (!url) throw new Error('响应中没有图片地址');
+			const url = await resolveJsonSource(source);
 			// Bing 的 API 只发横屏图；出图尺寸由它 CDN 的文件名决定，
 			// 所以按当前屏幕方向把尺寸段换成对应的那一档（竖屏要真竖图，不然裁掉大半）
 			return withBingSize(url, currentBingSize());
+		}
+
+		/**
+		 * json 类图源（目前只有 Bing）。
+		 *
+		 * 本站是纯静态站，**没法阻止**别人把接口地址抄走直接调用；
+		 * 但可以不让自己成为放大器：取到的地址缓存在本地轮换使用，
+		 * 攒够 BING_CACHE_MIN 条之后每轮只再请求一次，换图不再持续打接口。
+		 * 跨天允许重新取一张，保留「每日壁纸」本身的意义。
+		 * 接口挂掉时退回轮换缓存，不至于没有壁纸。
+		 */
+		async function resolveJsonSource(source: any): Promise<string> {
+			const today = new Date().toISOString().slice(0, 10);
+			const cached: string[] = Array.isArray(settings.bingUrls) ? settings.bingUrls : [];
+			const cursor = Number(settings.bingCursor) || 0;
+
+			const dayChanged = settings.bingDay !== today;
+			const tooThin = cached.length < BING_CACHE_MIN;
+			const exhausted = cursor >= cached.length;
+
+			// 三条都不成立才用缓存 —— 正常情况下换图不该碰对方接口
+			if (!dayChanged && !tooThin && !exhausted && cached.length) {
+				settings.bingCursor = cursor + 1;
+				save();
+				return cached[cursor];
+			}
+
+			try {
+				const response = await fetch(bust(source.url), { cache: 'no-store' });
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				const data = await response.json();
+				const fresh = safeUrl(pickByPath(data, source.pick));
+				if (!fresh) throw new Error('响应中没有图片地址');
+
+				settings.bingUrls = [...cached.filter((u) => u !== fresh), fresh].slice(-BING_CACHE_MAX);
+				settings.bingDay = today;
+				// 新图排在队尾，下次从头部开始轮换
+				settings.bingCursor = 0;
+				save();
+				return fresh;
+			} catch (error) {
+				if (!cached.length) throw error;
+				const index = cursor % cached.length;
+				settings.bingCursor = index + 1;
+				settings.bingDay = today;
+				save();
+				return cached[index];
+			}
 		}
 
 		/** 当前屏幕方向下应取的 Bing 出图尺寸 */
@@ -462,9 +519,22 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 
 		/* -------------------------------------------------- 换一张 */
 		let shuffling = false;
+		/** 上次手动换图的时间，用于冷却判断 */
+		let lastShuffleAt = 0;
 
 		async function shuffle(reason?: string) {
 			if (shuffling) return;
+
+			/*
+			 * 冷却：连点、或脚本循环点击，都不该持续打第三方接口。
+			 * 自动更换按分钟计，不受此限。
+			 */
+			if (reason !== 'auto' && Date.now() - lastShuffleAt < SHUFFLE_COOLDOWN) {
+				setStatus('换得有点快，稍等一下');
+				return;
+			}
+			lastShuffleAt = Date.now();
+
 			const pool = buildPool();
 
 			if (!pool.length) {
