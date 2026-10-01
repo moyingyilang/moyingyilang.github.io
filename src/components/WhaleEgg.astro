@@ -10,10 +10,13 @@
  *                    快速连点五次（间隔超过 RAPID_MS 即重置）
  * - [data-open-whale] 工具页解锁后出现的卡片，点一下直接看
  *
- * 图片是本地文件（public/easter-egg/），不请求任何外部接口。
+ * 图片是本地文件（public/easter-egg/），不请求任何外部接口 ——
+ * 由站主选定的那张来自梗鲸站，已下载后自托管，并保留「本图出处」外链。
  * 「看看大肥鱼」解锁后会记住，之后从工具页也能直接打开。
  */
 const WIKI_URL = 'https://aigengtu.com/zh/whale-chan';
+/** 当前这张图的原始条目页，作为出处标注 */
+const SOURCE_URL = 'https://aigengtu.com/zh/meme/1620';
 
 /**
  * 梗鲸站上的表情包条目 id。
@@ -39,9 +42,10 @@ const MEME_IDS = [
 	</div>
 
 	<figure class="ds-egg__frame">
-		<img class="ds-egg__art" id="dsEggArt" src="/easter-egg/deepseek-whale.png" alt="DeepSeek 鲸鱼娘" />
+		<img class="ds-egg__art" id="dsEggArt" src="/easter-egg/deepseek-whale.webp" alt="DeepSeek 鲸鱼娘" />
 		<figcaption class="ds-egg__meta">
 			<span>DeepSeek娘 · 蓝色大肥鱼</span>
+			<a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">本图出处 ↗</a>
 			<a href={WIKI_URL} target="_blank" rel="noopener noreferrer">角色百科 ↗</a>
 			<a id="dsEggRandom" href={WIKI_URL} target="_blank" rel="noopener noreferrer">随机一张表情包 ↗</a>
 		</figcaption>
