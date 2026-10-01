@@ -15,16 +15,23 @@
  * 该清单由 scripts/gen-wallpaper-manifest.mjs 生成，原因见那个脚本的注释。
  */
 
-export type SourceKind = 'image' | 'json';
+export type SourceKind = 'image' | 'json' | 'pool';
 
 export interface WallpaperSource {
 	id: string;
 	label: string;
 	kind: SourceKind;
-	/** image 类会 302 到真实图片；json 类返回 JSON */
+	/** image 类会 302 到真实图片；json 类返回 JSON；pool 类不看这个字段 */
 	url: string;
 	/** json 类：从响应中取出图片地址的点路径 */
 	pick?: string;
+	/** pool 类：指向 wallpaper-manifest.json 里 galleries 的键 */
+	galleryId?: string;
+	/**
+	 * 只在某一屏幕方向下使用；不填表示两个方向都用。
+	 * 用于那些本身就分横竖两套图的来源，避免竖屏拿到横图被裁掉大半。
+	 */
+	orientation?: 'portrait' | 'landscape';
 	/** 实测备注 */
 	verified: string;
 }
@@ -121,6 +128,36 @@ export const ANIME_SOURCES: WallpaperSource[] = [
 		kind: 'image',
 		url: 'https://www.loliapi.com/acg/',
 		verified: '稳定性一般，仅作备选',
+	},
+	/*
+	 * 通用动漫图集（Wallhaven）
+	 *
+	 * 与上面三个的区别：它不是"每次请求返回一张随机图"，而是构建期把直链
+	 * 枚举进清单、运行期从池里随机取。这么做是因为它的 API 没有 CORS 头，
+	 * 浏览器直接 fetch 会被拦；而图片 CDN（w.wallhaven.cc）反而是
+	 * access-control-allow-origin: *，所以清单化之后既能用也能下载。
+	 *
+	 * 它是通用动漫壁纸站，**不针对任何特定游戏或厂商**；
+	 * 采集时限定 purity=100（仅 SFW）与 categories=010（仅动漫），
+	 * 并按屏幕方向拆成竖屏／横屏两个图集。
+	 */
+	{
+		id: 'wallhaven-portrait',
+		label: '通用动漫 · 竖屏',
+		kind: 'pool',
+		url: '',
+		galleryId: 'wallhaven-portrait',
+		orientation: 'portrait',
+		verified: 'API 无 CORS，改为构建期固化直链；图片 CDN 带 CORS，可下载',
+	},
+	{
+		id: 'wallhaven-landscape',
+		label: '通用动漫 · 横屏',
+		kind: 'pool',
+		url: '',
+		galleryId: 'wallhaven-landscape',
+		orientation: 'landscape',
+		verified: 'API 无 CORS，改为构建期固化直链；图片 CDN 带 CORS，可下载',
 	},
 ];
 
@@ -271,6 +308,8 @@ export interface PoolCandidate {
 	pick?: string;
 	/** kind 为 pool 时，指向清单里的图集键 */
 	galleryId?: string;
+	/** 仅在该屏幕方向下参与抽取；不填表示两个方向都参与 */
+	orientation?: 'portrait' | 'landscape';
 }
 
 function toCandidate(source: WallpaperSource): PoolCandidate {
@@ -280,6 +319,8 @@ function toCandidate(source: WallpaperSource): PoolCandidate {
 		kind: source.kind,
 		url: source.url,
 		pick: source.pick,
+		galleryId: source.galleryId,
+		orientation: source.orientation,
 	};
 }
 

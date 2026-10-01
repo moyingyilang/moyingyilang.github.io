@@ -387,19 +387,31 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 				.flatMap((game: any) => game.candidates || []);
 			const pickedAnime = allAnime.filter((source: any) => settings.animes.includes(source.id));
 
-			switch (settings.mode) {
-				case 'bing':
-					return [...allBing];
-				case 'acg':
-					return [...allAnime, ...everyGame];
-				case 'acg-custom':
-					return [...pickedAnime, ...pickedGame];
-				case 'off':
-					return [];
-				case 'all':
-				default:
-					return [...allBing, ...allAnime, ...everyGame];
-			}
+			const pool = (() => {
+				switch (settings.mode) {
+					case 'bing':
+						return [...allBing];
+					case 'acg':
+						return [...allAnime, ...everyGame];
+					case 'acg-custom':
+						return [...pickedAnime, ...pickedGame];
+					case 'off':
+						return [];
+					case 'all':
+					default:
+						return [...allBing, ...allAnime, ...everyGame];
+				}
+			})();
+
+			/*
+			 * 有些来源本身就分横竖两套图（如通用动漫的竖屏／横屏图集），
+			 * 竖屏取横图会被 cover 裁掉大半，所以按当前方向筛一遍。
+			 * 若筛完为空（例如用户只勾了横屏那一个），退回未筛的池，
+			 * 宁可裁图也不能没有壁纸。
+			 */
+			const want = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+			const matched = pool.filter((source: any) => !source.orientation || source.orientation === want);
+			return matched.length ? matched : pool;
 		}
 
 		/* ------------------------------------------- 交叉淡入与应用 */

@@ -16,12 +16,80 @@
  * 用法：node scripts/gen-wallpaper-manifest.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /** 每个图集最多收录多少张，控制清单体积 */
 const PER_GALLERY = 100;
+
+/**
+ * Wallhaven：通用动漫壁纸，**不对应任何特定游戏或厂商**。
+ *
+ * 为什么走构建期而不是运行期直连：
+ * 它的 API（wallhaven.cc/api）**没有 CORS 头**，浏览器里 fetch 会被拦；
+ * 但图片 CDN（w.wallhaven.cc）是 `access-control-allow-origin: *`，
+ * 所以做法是构建期把直链枚举进清单、由本站同源托管，运行期照常随机取图。
+ *
+ * 筛选条件：purity=100 只取 SFW、categories=010 只取动漫，
+ * 并按屏幕方向分开成两个图集（ratios + atleast），
+ * 这样客户端能按当前方向只用对应的那一组。
+ */
+const WALLHAVEN = [
+	{
+		id: 'wallhaven-portrait',
+		label: '通用动漫 · 竖屏',
+		ratios: 'portrait',
+		atleast: '1080x1920',
+		resolution: '1080x1920 起',
+		note: 'Wallhaven 动漫分区，SFW，按竖屏筛选',
+	},
+	{
+		id: 'wallhaven-landscape',
+		label: '通用动漫 · 横屏',
+		ratios: 'landscape',
+		atleast: '1920x1080',
+		resolution: '1920x1080 起',
+		note: 'Wallhaven 动漫分区，SFW，按横屏筛选',
+	},
+];
+
+/** 翻几页；Wallhaven 匿名接口约 45 次/分钟，页数不宜多 */
+const WALLHAVEN_PAGES = 6;
+/** 单张体积上限，原图动辄 5MB+，做背景太重 */
+const WALLHAVEN_MAX_BYTES = 2_500_000;
+
+/** 拉取一个 Wallhaven 图集，返回图片直链 */
+async function fetchWallhaven(spec) {
+	const urls = [];
+	for (let page = 1; page <= WALLHAVEN_PAGES; page += 1) {
+		const query = new URLSearchParams({
+			purity: '100',
+			categories: '010',
+			sorting: 'toplist',
+			order: 'desc',
+			ratios: spec.ratios,
+			atleast: spec.atleast,
+			page: String(page),
+		});
+		const response = await fetch(`https://wallhaven.cc/api/v1/search?${query}`, {
+			headers: { 'User-Agent': 'moyingyilang.github.io wallpaper manifest generator' },
+		});
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const body = await response.json();
+
+		for (const item of body.data ?? []) {
+			// 只留体积可控的 JPEG／PNG，跳过 5MB 以上的原图
+			if (!item?.path) continue;
+			if (Number(item.file_size) > WALLHAVEN_MAX_BYTES) continue;
+			if (!/^image\/(jpeg|png)$/.test(item.file_type || '')) continue;
+			urls.push(item.path);
+		}
+		await new Promise((r) => setTimeout(r, 1200));
+	}
+	// 去重后按固定数量截断
+	return [...new Set(urls)].slice(0, PER_GALLERY);
+}
 
 /**
  * 要收录的图集。
@@ -103,6 +171,29 @@ function listFiles(probeDir, dir) {
 
 const galleries = {};
 const workRoot = mkdtempSync(join(tmpdir(), 'wp-manifest-'));
+const target = new URL('../public/wallpaper-manifest.json', import.meta.url);
+
+/**
+ * 读上一版清单。
+ * 某个图集这次抓取失败时（仓库拉不动、图源改版等）用它兜底，
+ * 否则那一次刷新会把已有图集整个抹掉，来源直接失效。
+ */
+let previous = { galleries: {} };
+try {
+	previous = JSON.parse(readFileSync(target, 'utf8'));
+} catch {
+	/* 首次生成，没有上一版 */
+}
+
+function keepPrevious(id, reason) {
+	const old = previous.galleries?.[id];
+	if (!old?.urls?.length) {
+		console.warn(`  !! ${id} 失败（${reason}），且没有可保留的旧数据`);
+		return;
+	}
+	galleries[id] = old;
+	console.warn(`  !! ${id} 失败（${reason}），已保留上一版的 ${old.urls.length} 张`);
+}
 const cloned = new Map();
 
 try {
@@ -149,11 +240,35 @@ try {
 			};
 			console.log(`  ${gallery.id}: 仓库内 ${all.length} 张，收录 ${picked.length} 张`);
 		} catch (error) {
-			console.error(`  !! ${gallery.id} 失败: ${error.message}`);
+			keepPrevious(gallery.id, error.message);
 		}
 	}
 } finally {
 	rmSync(workRoot, { recursive: true, force: true });
+}
+
+/* ---------------------------------------------------------------- Wallhaven */
+console.log('\nWallhaven（通用动漫，与厂商无关）');
+for (const spec of WALLHAVEN) {
+	try {
+		const urls = await fetchWallhaven(spec);
+		if (!urls.length) {
+			keepPrevious(spec.id, '没有取到图片');
+			continue;
+		}
+		galleries[spec.id] = {
+			label: spec.label,
+			repo: 'wallhaven.cc',
+			dir: `search?ratios=${spec.ratios}&atleast=${spec.atleast}`,
+			resolution: spec.resolution,
+			note: spec.note,
+			count: urls.length,
+			urls,
+		};
+		console.log(`  ${spec.id}: 收录 ${urls.length} 张`);
+	} catch (error) {
+		keepPrevious(spec.id, error.message);
+	}
 }
 
 const manifest = {
@@ -166,7 +281,6 @@ const manifest = {
 	galleries,
 };
 
-const target = new URL('../public/wallpaper-manifest.json', import.meta.url);
 writeFileSync(target, JSON.stringify(manifest, null, '\t') + '\n');
 
 const total = Object.values(galleries).reduce((sum, g) => sum + g.count, 0);
