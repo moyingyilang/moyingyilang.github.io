@@ -58,6 +58,7 @@ export const MENU_DATA = [
 			{ label: '开发环境', path: 'env' },
 			{ label: '容器与运维', path: 'ops' },
 			{ label: '网络与协议', path: 'network' },
+			{ label: 'Android 与刷机', path: 'android' },
 		],
 	},
 	{

@@ -1,0 +1,190 @@
+---
+title: Android 分区架构与刷机视角总结
+description: 从刷机视角梳理 Android 分区架构：system-as-root、A/B 与 A-Only、super.img 动态分区、VAB/VABC 虚拟 A/B 与 COW 快照、Device Mapper 支撑，以及独立 recovery_ab 对可玩性的改善。
+date: 2026-10-01
+category: android
+tags:
+  - Android
+  - 分区
+  - 刷机
+  - VAB
+  - super.img
+---
+
+> 总结范围：system-as-root、A/B、A-Only、super.img、动态分区、VAB/VABC、Device Mapper、同级分区术语，以及刷机／Recovery／Root 视角下的利弊。
+
+## 0. 一句话总览
+
+- **System-as-root (SAR)**：启动逻辑，让 `system` 分区直接作为根目录 `/`。
+- **A/B 与 A-Only**：更新机制，决定系统分区有几套副本。
+- **super.img / 动态分区**：存储方式，把多个逻辑分区打包进一个大容器。
+- **VAB / VABC**：虚拟 A/B 与压缩快照，用 `/data` 中的 COW 增量替代物理双份系统分区。
+- **搞机视角**：VAB/VABC 对普通用户和厂商更友好，但对刷 Recovery、Root、手动刷分区更麻烦；厂商加回独立 `recovery_ab` 是重要改善。
+
+## 1. System-as-root (SAR)
+
+SAR 改变的是系统根目录 `/` 的来源。
+
+- **传统非 SAR**：内核先加载 `boot` 分区中的 `ramdisk.img` 作为临时根目录，再挂载 `system` 到 `/system`。
+- **SAR**：`ramdisk.img` 合并进 `system.img`，内核直接挂载 `system` 分区作为根目录 `/`。
+
+Google 从 **Android 9** 开始强制新设备使用 SAR，目的是支持更灵活的系统专用 OTA。
+
+## 2. A/B 与 A-Only
+
+| 机制 | 分区副本 | OTA 方式 | 风险与特点 |
+| --- | --- | --- | --- |
+| A-Only | 一套系统分区 | Recovery 模式下离线安装 | 省空间，但更新失败可能变砖，通常有独立 `recovery` |
+| A/B | A、B 两套系统分区 | 后台静默更新到空闲槽，重启切换 | 无缝、安全、可回滚，但系统分区占用翻倍，通常无独立 `recovery` |
+
+简单说：
+
+- **A/B 用空间换安全**。
+- **A-Only 用风险换空间**。
+- Google 从 Android 7.0 引入 A/B，但长期是推荐而非绝对强制。
+
+## 3. super.img 与动态分区
+
+`super.img` 是 Android 动态分区机制的产物，像一个「容器」，内部包含：
+
+- `system`
+- `vendor`
+- `product`
+- `system_ext`
+- `odm`
+- 等逻辑分区
+
+核心优势：
+
+- 逻辑分区大小可在编译或 OTA 时**动态调整**。
+- 解决传统物理分区大小写死、调整困难的问题。
+
+工作原理：
+
+- `super` 分区包含描述内部子分区的 **metadata**。
+- 启动时 `init` 解析 metadata，通过 `dm-linear` 创建虚拟块设备。
+- 再挂载这些逻辑分区使用。
+
+## 4. 三者关系与演进
+
+| 组合 | 典型时期 | 特点 |
+| --- | --- | --- |
+| SAR + A-Only | Android 9+ 非 A/B 设备 | `system` 作为根，但只有一套，更新仍有风险 |
+| SAR + A/B | Android 9+ A/B 设备 | 兼顾 SAR 灵活性与 A/B 安全性 |
+| SAR + A/B + 动态分区 | Android 10+ 主流 | `super` 内含 A/B 逻辑分区，灵活、安全、节省空间 |
+| Virtual A/B (VAB) | Android 11+ 广泛采用 | 不再物理保留完整 B 槽，用 COW 快照节省空间 |
+| VABC | Android 12 引入，Android 13 强制 | 压缩快照，改善 VAB 合并慢、占 `/data` 的问题 |
+
+## 5. 传统 A/B 到底浪费在哪？
+
+结论：
+
+- **不是物理总容量翻倍**。
+- **也不是软件多标一份那么简单**。
+- 它是在**同一颗物理存储芯片内，把系统分区占用翻倍**。
+
+分三层看：
+
+1. **物理硬件层面**：128GB 手机还是 128GB，芯片容量不变。
+2. **分区占用层面**：A-Only 时 `system + vendor` 等假设占 4GB；A/B 后两套各 4GB，系统区总占 8GB。
+3. **用户体验层面**：多出来的 4GB 从 `/data` 用户空间里扣，所以 128GB 手机可用空间会缩水。
+
+因此，传统 A/B 的代价可以理解为：
+
+> 牺牲用户可用空间，换取无缝更新和回滚安全。
+
+## 6. Virtual A/B (VAB) 与 VABC
+
+VAB 不再保留完整 B 槽物理副本，而是使用**写时复制 COW（Copy-on-Write）**。
+
+更新过程：
+
+- 系统在正在运行的 A 槽上打补丁。
+- 被修改的块数据不覆盖原分区，而是暂存到 `/data` 下的 COW 文件。
+- 重启后，`snapuserd` 将 A 槽原始数据与 COW 增量叠加成虚拟 B 槽视图启动。
+
+优点：
+
+- 只占增量空间，通常几百 MB，而非整个分区双倍。
+- 让低存储设备也能用无缝更新。
+
+代价：
+
+- OTA 合并速度可能更慢，更耗电。
+- `/data` 空间不足会导致更新失败。
+- 回滚逻辑更复杂。
+- COW 快照元数据损坏时，可能新旧系统都进不去，需要线刷救砖。
+
+VABC：
+
+- Android 12 引入压缩快照。
+- 对 COW 增量数据压缩，减少写入 `/data` 的数据量。
+- Android 13 成为强制要求，基本缓解 VAB 的空间和性能瓶颈。
+
+## 7. Device Mapper 底层支撑
+
+VAB、动态分区、验证启动都依赖 Linux 内核 **Device Mapper**。
+
+核心模块：
+
+- `dm-linear`：把物理存储块映射成连续虚拟设备，是动态分区基础。
+- `dm-verity`：块设备透明完整性校验，确保系统分区未被篡改。
+- `dm-snapshot`：为虚拟 A/B 快照提供支持。
+- `dm-user` / `snapuserd`：Android 12 起用于用户空间实现压缩快照。
+
+## 8. 同级/相关分区术语
+
+| 分区 | 作用 |
+| --- | --- |
+| `boot` | 内核与早期 ramdisk；A/B 设备中有时集成 recovery |
+| `init_boot` | Android 13 起专门存放 ramdisk |
+| `recovery` / `recovery_ab` | 恢复模式；A/B 独立 recovery 可改善刷机体验 |
+| `vendor` | 厂商硬件相关代码和库 |
+| `odm` | 比 vendor 更底层的定制内容 |
+| `product` | 产品专属模块 |
+| `system_ext` | 扩展通用系统镜像的专属资源 |
+| `userdata` | 用户数据分区，即 `/data` |
+| `cache` | 缓存分区，临时数据 |
+| `misc` | Recovery 与 Bootloader 通信 |
+| `vbmeta` | 验证启动 Verified Boot 校验信息 |
+
+## 9. 搞机视角：VAB 的痛点与 recovery_ab 的改进
+
+### 9.1 VAB 对刷机爱好者的主要痛点
+
+- **逻辑分区替代物理分区**：不能直接 `fastboot flash system` 或 `fastboot flash vendor`，通常要刷整个 `super.img` 或完整 payload。
+- **Recovery 被阉割或集成**：A-Only 有独立 recovery，随便刷 TWRP；VAB + Android 13+ 还拆出 `init_boot`，TWRP 适配难度大增。
+- **COW 快照带来新变砖姿势**：OTA 后存在挂起快照时，乱刷 `init_boot` 或改 `super` 可能损坏快照元数据，导致新旧系统都无法启动。
+- **Root 更憋屈**：Magisk 常需修补 `init_boot` 或 `boot`，且要确保 A/B 槽版本一致，否则可能无限重启。
+
+因此有一种观点：
+
+> VAB/VABC 对普通用户和厂商是进步，但对搞机圈是「灾难级」可玩性倒退。
+> 某些情况下，VAB 甚至不如 A-Only 方便，因为它大大增加了刷 Recovery 或 Root 的难度。
+
+### 9.2 小米 `recovery_ab` 是好事
+
+小米在骁龙 8 Gen 1 及后续机型上，强行分离出独立 `recovery` 分区，并命名为 `recovery_ab`。
+
+好处：
+
+- 可以像传统机型一样直接刷第三方 Recovery。
+- Root 操作更安全，`boot` 只放内核，Recovery 环境独立。
+- 降低刷错 `boot` 导致变砖的风险。
+
+注意差异：
+
+- 并非所有厂商都跟进。
+- 联发科天玑 8100 等机型可能把 Recovery 移到 `vendor_boot`。
+- 骁龙 8 Gen 1 之前的小米 VAB 机型，可能仍无独立 Recovery。
+
+这可以视为对 VAB 刷机痛点的重要修正。
+
+## 10. 最终结论
+
+- **普通用户/厂商视角**：VAB/VABC 更优，省空间、无缝更新、易回滚。
+- **搞机视角**：传统 A-Only 或独立 Recovery 更友好；VAB 增加刷机复杂度。
+- **折中方向**：厂商在 VAB 基础上加回独立 `recovery_ab`，兼顾安全更新与刷机可玩性。
+- **技术主线**：从 A-Only 到 A/B 是为了更新安全；从非 SAR 到 SAR 是为了架构统一；从物理分区到动态分区与 VAB/VABC 是为了空间灵活与效率。
+
+> 一句话：传统 A/B 用系统分区双份换安全；VAB/VABC 用 COW 快照换空间；独立 `recovery_ab` 则是在 VAB 时代把刷机体验往回拉了一步。
