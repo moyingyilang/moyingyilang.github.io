@@ -9,14 +9,18 @@ const latest = posts.slice(0, 4);
 const menuNodes = flattenMenu();
 const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 
+/** 首页卡片的一句话说明，键为 menu 里的 path；没写到的分类会回退到显示子分类数量 */
 const SECTION_DESC: Record<string, string> = {
-	tech: '物理、化学与实验类笔记',
-	code: '容器、开发语言与开发环境',
-	notes: '项目进度、攻略、PCB 与刷机',
+	start: '安装、配置与最简上手路径',
+	guide: '写作方式与排版样式参考',
+	notes: '随手记录与零散想法',
 	tools: '自用的小工具集合',
 	faq: '常见问题与排查记录',
 	about: '关于本站与联系方式',
 };
+
+/** 「开始阅读」指向导航里的第一个分类，避免把栏目名写死在首页 */
+const firstSection = MENU_DATA[0];
 ---
 
 <BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION} bare>
@@ -26,7 +30,7 @@ const SECTION_DESC: Record<string, string> = {
 		<p class="page-desc">{SITE_DESCRIPTION}</p>
 
 		<div class="row hero__actions">
-			<a class="btn btn--accent" href="/tech">
+			<a class="btn btn--accent" href={`/${firstSection.path}`}>
 				开始阅读
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="hero__cta-icon">
 					<path d="M5 12h13" /><path d="m12 6 6 6-6 6" />
@@ -79,7 +83,9 @@ const SECTION_DESC: Record<string, string> = {
 							)}
 							<h3 class="card__title">{item.label}</h3>
 						</div>
-						<p class="card__desc">{SECTION_DESC[item.path] ?? ''}</p>
+						<p class="card__desc">
+							{SECTION_DESC[item.path] ?? `${item.children?.length ?? 0} 个子分类`}
+						</p>
 						{item.children?.length ? (
 							<p class="card__meta">
 								<span>{item.children.length} 个子分类</span>

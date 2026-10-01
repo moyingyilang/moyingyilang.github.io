@@ -1,7 +1,53 @@
-# 路遥起森的博客
+# Astro 毛玻璃文档站模板
 
-基于 Astro 6 的静态文档站，视觉基调是 **Fluent（Windows 11 Acrylic / Mica）× MIUI（miuix）毛玻璃**：
+一套基于 **Astro 7** 的静态文档站 / 博客模板，视觉基调是
+**Fluent（Windows 11 Acrylic / Mica）× MIUI（miuix）毛玻璃**：
 Fluent 提供层级、强调条与 Acrylic 颗粒质感，MIUI 提供圆角尺度、留白与橙→蓝渐变玻璃。
+
+- 分支：`template`（本分支，通用化模板） ← 由 `main` 派生
+- 许可：AGPL-3.0-only
+
+## 如何使用这个模板
+
+### 方式一：作为模板仓库（推荐）
+
+在 GitHub 上点 **Use this template**（或 fork），然后按下面 4 步改。
+
+### 方式二：只取代码
+
+```sh
+git clone -b template --depth 1 https://github.com/your-name/your-repo.git my-site
+cd my-site && rm -rf .git && pnpm install
+```
+
+### 建站必改的 4 处
+
+| 顺序 | 文件 | 改什么 |
+| --- | --- | --- |
+| 1 | `src/consts.ts` | 站名、描述、作者、社交链接、仓库地址、许可证信息 |
+| 2 | `astro.config.mjs` | `site` 改成你的域名；部署到项目页时同时设 `base` |
+| 3 | `src/config/menu.js` | `MENU_DATA` 改成你的栏目结构（侧边栏、面包屑、分类路由都由它派生） |
+| 4 | `src/content/blog/` | 删掉示例文章，换成你自己的 `.md` / `.mdx` |
+
+改完跑一次验证：
+
+```sh
+pnpm install
+pnpm verify      # 构建 + 产物校验（关键文件、内部链接、搜索索引、图集清单）
+```
+
+### 页脚社交图标
+
+`src/consts.ts` 的 `SOCIAL_LINKS` 决定页脚按钮，图标在
+`src/components/Footer.astro` 的 `ICONS` 里按 `label` 匹配。
+**新增的 label 若没有对应图标，会自动回退成文字链接**，不会被静默丢弃。
+
+### 默认内容说明
+
+- `src/content/blog/style-guide.mdx` 是样式参考，列出了所有正文元素的写法，可留作写作模板
+- `public/wallpaper-manifest.json` 是壁纸图集的**演示数据**（游戏素材链接），
+  与你的站点无关，可用 `pnpm refresh:wallpapers` 重新生成或直接删掉该文件
+- 壁纸设置里的游戏图源若不需要，把 `src/config/wallpapers.ts` 的 `GAMES` 清空即可
 
 ## 特性
 
@@ -9,8 +55,12 @@ Fluent 提供层级、强调条与 Acrylic 颗粒质感，MIUI 提供圆角尺�
 - 🧭 左侧导航树 + 右侧本页目录 + 阅读进度条 + 回到顶部
 - 🔍 命令面板搜索（`Ctrl` / `⌘` + `K`，或按 `/`）
 - 🖼️ 图片点击放大灯箱、代码块一键复制、表格自适应滚动
+- 🖼️ 可调壁纸系统：五种来源模式、模糊/压暗滑杆、自动更换
 - 📄 文章集合自动汇总到分类页、RSS 与搜索索引
+- 🔒 默认 AGPL-3.0-only，页脚与「关于」页自动标注许可
+- 🤖 「关于」页与页脚带 AI 参与声明（可一处开关）
 - ♿ 禁用 JS 时内容依然完整可见（入场动画有兜底降级）
+- ✅ 自带产物校验与图源失效检测脚本，可直接接进 CI
 
 ## 目录结构
 
@@ -44,14 +94,14 @@ src/
 title: 标题                       # 必填
 description: 摘要                 # 会显示在卡片、RSS 与搜索索引
 date: 2026-04-12
-category: physics-e              # 填导航叶子节点的 path，见下
+category: writing                 # 填导航叶子节点的 path，见下
 tags: ['标签一', '标签二']
 draft: false                     # true 则不参与构建产物
 ---
 ```
 
 `category` 决定文章归属哪个分类页：填 `src/config/menu.js` 里叶子节点的 `path` 片段
-（如 `physics-e`、`container`、`game-guides`），填错时文章仍会出现在文章列表里。
+（模板示例里是 `install`、`config`、`writing`、`style`、`misc`），填错时文章仍会出现在文章列表里。
 
 上一篇 / 下一篇默认按日期自动推导，需要手动指定时写上 `prev` / `next`。
 
@@ -60,7 +110,7 @@ draft: false                     # true 则不参与构建产物
 只改 `src/config/menu.js` 一处。侧边栏、顶栏面包屑、分类页路由、搜索索引都由它派生。
 
 ```js
-{ label: '科创', path: 'tech', icon: '<path .../>', children: [ ... ] }
+{ label: '入门', path: 'start', icon: '<path .../>', children: [ ... ] }
 ```
 
 - 带 `children` 的节点渲染为可展开分组
@@ -305,3 +355,42 @@ Co-Authored-By: DeepSeek Harness <noreply@deepseek.com>
 
 GitHub 会把带 `Co-Authored-By` 的提交在提交页显示为双作者。
 也可以建一个 `CONTRIBUTORS.md`，或在某个提交上打 `Assisted-by:` trailer（非标准但可读）。
+
+## 分支说明：main 与 template 如何同步
+
+| 分支 | 用途 |
+| --- | --- |
+| `main` | 实际运行的站点（含站点作者的个人信息与内容） |
+| `template` | 由 `main` 派生的通用化模板，把个人信息换成了占位符 |
+
+两者是**同源不同内容**的关系，不是简单的镜像。因此同步方式是：
+
+```sh
+# 在 template 上合入 main 的改进（例如新增组件、修 bug、升级依赖）
+git checkout template
+git merge main
+
+# 冲突只会出现在被通用化过的文件里，逐个解决即可：
+#   src/consts.ts            保留 template 的占位符版本
+#   src/config/menu.js       保留 template 的示例导航
+#   src/content/blog/*       保留 template 的示例文章
+#   astro.config.mjs 的 site 保留占位域名
+#   README.md                保留 template 的建站说明
+#   src/styles/global.css    一般无冲突，取 main 即可
+
+git commit            # 完成合并
+git push origin template
+```
+
+反过来若在 `template` 上修了通用性问题（比如把硬编码链接改成读取常量），
+可以挑回 `main`：
+
+```sh
+git checkout main
+git cherry-pick <template 上的提交>
+```
+
+> ⚠️ 不要把 `main` 直接快进合并到 `template`（`git merge --ff-only`），
+> 那会把个人信息带进模板分支。务必用普通 merge 并保留占位符版本。
+
+`pnpm verify` 在两个分支上都应当通过；提交前请各自跑一次。

@@ -5,7 +5,9 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://moyingyilang.github.io/',
+	// 改成你自己的域名。部署到 GitHub Pages 项目页时形如
+	// https://<用户名>.github.io/<仓库名>/ ，并把下面的 base 设为 '/<仓库名>'
+	site: 'https://example.com/',
 	base: '',
 	output: 'static',
 	integrations: [mdx(), sitemap()],

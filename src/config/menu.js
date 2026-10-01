@@ -24,42 +24,40 @@ const ICONS = {
 		'<circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>',
 };
 
+/*
+ * 示例导航结构（改成你自己的）
+ *
+ * 只需改这一处：侧边栏、顶栏面包屑、分类页路由、搜索索引都由它派生。
+ * 字段说明见文件顶部注释。
+ */
 export const MENU_DATA = [
 	{
-		label: '科创',
-		path: 'tech',
+		// 有 children 的节点渲染为可展开分组，本身也会有兜底的分类页
+		label: '入门',
+		path: 'start',
 		icon: ICONS.tech,
 		children: [
-			{ label: '物理-电', path: 'physics-e' },
-			{ label: '物理-力', path: 'physics-f' },
-			{ label: '化学', path: 'chemistry' },
-			{ label: '技巧/小知识', path: 'tips' },
+			{ label: '安装', path: 'install' },
+			{ label: '配置', path: 'config' },
 		],
 	},
 	{
-		label: '代码',
-		path: 'code',
+		label: '指南',
+		path: 'guide',
 		icon: ICONS.code,
 		children: [
-			{ label: '容器', path: 'container' },
-			{ label: '开发语言', path: 'language' },
-			{ label: '开发环境', path: 'env' },
+			{ label: '写作', path: 'writing' },
+			{ label: '样式参考', path: 'style' },
 		],
 	},
 	{
-		label: '小知识/随笔',
+		label: '随笔',
 		path: 'notes',
 		icon: ICONS.notes,
-		children: [
-			{ label: '开发者目前研究项目', path: 'dev-projects' },
-			{ label: '项目往事及进度', path: 'project-history' },
-			{ label: '部分游戏总结的攻略', path: 'game-guides' },
-			{ label: 'pcb设计和电路原理等', path: 'pcb' },
-			{ label: '刷机圈小瓜', path: 'flash-gossip' },
-			{ label: 'git项目监控引擎', path: 'git-monitor' },
-		],
+		children: [{ label: '随手记', path: 'misc' }],
 	},
-	{ label: '杂项工具', path: 'tools', icon: ICONS.tools, dedicated: true },
+	// dedicated: true 表示该节点已有独立页面，不再由 [...category] 兜底路由生成
+	{ label: '工具', path: 'tools', icon: ICONS.tools, dedicated: true },
 	{ label: '常见问题', path: 'faq', icon: ICONS.faq, dedicated: true },
 	{ label: '关于', path: 'about', icon: ICONS.about, dedicated: true },
 ];

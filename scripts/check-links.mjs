@@ -22,8 +22,14 @@ const DIST = resolve(import.meta.dirname, '..', 'dist');
 const baseIndex = process.argv.indexOf('--base');
 const BASE = baseIndex === -1 ? '' : (process.argv[baseIndex + 1] ?? '').replace(/\/+$/, '');
 
-/** 必须存在的产物：缺任何一个都说明构建链路出了问题 */
-const REQUIRED = [
+/**
+ * 必须存在的固定产物：缺任何一个都说明构建链路出了问题
+ *
+ * 分类页与文章页**不写死**，而是从 src/config/menu.js 与
+ * src/content/blog/ 推导出来 —— 这样换一套栏目结构或换内容后，
+ * 校验依然有效，不必改这个脚本。
+ */
+const REQUIRED_STATIC = [
 	'index.html',
 	'404.html',
 	'rss.xml',
@@ -31,12 +37,40 @@ const REQUIRED = [
 	'search-index.json',
 	'wallpaper-manifest.json',
 	'blog/index.html',
-	'blog/test/index.html',
-	'about/index.html',
-	'faq/index.html',
-	'tools/index.html',
-	'tech/index.html',
-	'tech/physics-e/index.html',
+];
+
+/** 从 menu.js 推导分类页路由；dedicated 节点有独立页面，不走兜底路由 */
+async function requiredFromMenu() {
+	try {
+		const mod = await import('../src/config/menu.js');
+		const paths = mod.categoryPaths();
+		return paths.map((p) => `${p}/index.html`);
+	} catch (error) {
+		console.warn(`  注意：无法从 menu.js 推导路由（${error.message}），跳过该项`);
+		return [];
+	}
+}
+
+/** 从内容目录推导文章页路由 */
+function requiredFromContent() {
+	try {
+		const dir = resolve(import.meta.dirname, '..', 'src', 'content', 'blog');
+		return readdirSync(dir)
+			.filter((f) => /\.mdx?$/.test(f))
+			.map((f) => `blog/${f.replace(/\.mdx?$/, '')}/index.html`);
+	} catch {
+		return [];
+	}
+}
+
+/** 独立页面（与 menu 里的 dedicated 节点对应） */
+const REQUIRED_PAGES = ['about/index.html', 'faq/index.html', 'tools/index.html'];
+
+const REQUIRED = [
+	...REQUIRED_STATIC,
+	...REQUIRED_PAGES,
+	...(await requiredFromMenu()),
+	...requiredFromContent(),
 ];
 
 if (!existsSync(DIST)) {
