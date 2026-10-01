@@ -1,32 +1,92 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-/** 站内提供的入口 */
-const SITE_TOOLS = [
+/**
+ * 站内提供的入口，按用途分三组。
+ *
+ * 带 action 的卡片不跳转，而是触发页面上已有的控件
+ * （搜索面板 / 主题切换 / 外观设置抽屉 / 换壁纸），
+ * 对应关系写在文件底部的 script 里。
+ */
+const SITE_GROUPS = [
 	{
-		title: '站内搜索',
-		desc: '按标题、描述与分类检索全站内容，支持键盘操作。',
-		href: '#',
-		action: 'search',
-		badge: 'Ctrl + K',
+		label: '阅读与检索',
+		items: [
+			{
+				title: '站内搜索',
+				desc: '按标题、描述与分类检索全站内容，支持键盘上下选择与回车跳转。',
+				href: '#',
+				action: 'search',
+				badge: 'Ctrl + K',
+			},
+			{
+				title: '文章归档',
+				desc: '按分类归集浏览全部文章，标注发布日期、阅读时长与标签。',
+				href: '/blog',
+				badge: '列表',
+			},
+			{
+				title: '常见问题',
+				desc: '本站的内容组织方式、导航配置与构建部署说明。',
+				href: '/faq',
+				badge: '页面',
+			},
+			{
+				title: '关于本站',
+				desc: '站点定位、技术栈、开源许可与 AI 参与声明。',
+				href: '/about',
+				badge: '页面',
+			},
+		],
 	},
 	{
-		title: 'RSS 订阅',
-		desc: '用任意阅读器订阅本站更新，只包含正式发布的文章。',
-		href: '/rss.xml',
-		badge: 'XML',
+		label: '订阅与索引',
+		items: [
+			{
+				title: 'RSS 订阅',
+				desc: '用任意阅读器订阅本站更新，只包含正式发布的文章。',
+				href: '/rss.xml',
+				badge: 'XML',
+			},
+			{
+				title: '站点地图',
+				desc: '提交给搜索引擎的全站 URL 索引，构建时自动生成。',
+				href: '/sitemap-index.xml',
+				badge: 'XML',
+			},
+			{
+				title: '搜索索引',
+				desc: '命令面板懒加载的 JSON 索引，含全部文章与分类条目，可自行取用。',
+				href: '/search-index.json',
+				badge: 'JSON',
+			},
+		],
 	},
 	{
-		title: '站点地图',
-		desc: '提交给搜索引擎的全站 URL 索引，构建时自动生成。',
-		href: '/sitemap-index.xml',
-		badge: 'XML',
-	},
-	{
-		title: '文章归档',
-		desc: '按分类归集浏览全部文章，带标签与阅读时长标注。',
-		href: '/blog',
-		badge: '列表',
+		label: '外观与显示',
+		items: [
+			{
+				title: '切换主题',
+				desc: '在浅色与深色外观之间切换，选择会记在本地，下次访问沿用。',
+				href: '#',
+				action: 'theme',
+				badge: '浅色 / 深色',
+			},
+			{
+				title: '外观设置',
+				desc: '调整壁纸来源、模糊与压暗程度，以及自动更换的间隔。',
+				href: '#',
+				action: 'settings',
+				badge: '设置面板',
+			},
+			{
+				title: '换一张壁纸',
+				desc: '立刻从当前来源里随机换一张，不必先打开设置面板。',
+				href: '#',
+				action: 'shuffle',
+				badge: '随机',
+			},
+		],
 	},
 ];
 
@@ -424,6 +484,7 @@ const APP_GROUPS = [
 ];
 
 const total = APP_GROUPS.reduce((sum, group) => sum + group.items.length, 0);
+const siteTotal = SITE_GROUPS.reduce((sum, group) => sum + group.items.length, 0);
 ---
 
 <BaseLayout
@@ -440,31 +501,39 @@ const total = APP_GROUPS.reduce((sum, group) => sum + group.items.length, 0);
 		<span class="page-head__eyebrow badge">独立页面</span>
 		<h1 class="page-title">杂项工具</h1>
 		<p class="page-desc">
-			本站可用的检索、订阅与索引入口，以及长期在用的软件清单（{total} 项，均给出可获取的出处）。
+			本站的检索、订阅与外观设置入口（{siteTotal} 项），以及长期在用的软件清单（{total} 项，均给出可获取的出处）。
 		</p>
 	</div>
 
 	<section class="tool-section">
 		<h2 class="section-heading">站内入口</h2>
-		<div class="grid grid--2">
-			{
-				SITE_TOOLS.map((tool, index) => (
-					<a
-						class="card reveal"
-						href={tool.href}
-						data-tool={tool.action ?? undefined}
-						style={`transition-delay:${Math.min(index * 45, 220)}ms`}
-					>
-						<span class="card__arrow">→</span>
-						<div class="tool__head">
-							<h3 class="card__title">{tool.title}</h3>
-							<span class="badge badge--muted">{tool.badge}</span>
-						</div>
-						<p class="card__desc">{tool.desc}</p>
-					</a>
-				))
-			}
-		</div>
+
+		{
+			SITE_GROUPS.map((group) => (
+				<div class="tool-group">
+					<h3 class="tool-group__head glass">
+						{group.label}
+						<span class="tool-group__count">{group.items.length}</span>
+					</h3>
+					<div class="grid grid--2">
+						{group.items.map((item) => (
+							<a
+								class="card reveal"
+								href={item.href}
+								data-site-action={item.action ?? undefined}
+							>
+								<span class="card__arrow">→</span>
+								<div class="tool__head">
+									<h4 class="card__title">{item.title}</h4>
+									<span class="badge badge--muted">{item.badge}</span>
+								</div>
+								<p class="card__desc">{item.desc}</p>
+							</a>
+						))}
+					</div>
+				</div>
+			))
+		}
 	</section>
 
 	<section class="tool-section">
@@ -504,11 +573,25 @@ const total = APP_GROUPS.reduce((sum, group) => sum + group.items.length, 0);
 </BaseLayout>
 
 <script>
-	// 「站内搜索」卡片直接唤起搜索面板，而不是做一次无效跳转
-	document.querySelector('[data-tool="search"]')?.addEventListener('click', (event) => {
-		event.preventDefault();
-		document.getElementById('searchOpen')?.click();
-	});
+	/*
+	 * 带 data-site-action 的卡片不跳转，而是点击页面上已有的控件。
+	 * 复用顶栏那几个按钮，避免入口卡片和顶栏出现两套行为。
+	 */
+	const SITE_ACTIONS = {
+		search: 'searchOpen',
+		settings: 'settingsOpen',
+		theme: 'themeToggle',
+		shuffle: 'wallpaperShuffle',
+	};
+
+	for (const card of document.querySelectorAll('[data-site-action]')) {
+		const targetId = SITE_ACTIONS[card.dataset.siteAction];
+		if (!targetId) continue;
+		card.addEventListener('click', (event) => {
+			event.preventDefault();
+			document.getElementById(targetId)?.click();
+		});
+	}
 </script>
 
 <style>
