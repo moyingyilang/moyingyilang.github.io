@@ -1,24 +1,73 @@
 ---
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import BaseHead from '../components/BaseHead.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const FAQS = [
+	{
+		q: '怎么新增一篇文章？',
+		a: '在 <code>src/content/blog/</code> 下新建 <code>.md</code> 或 <code>.mdx</code> 文件，frontmatter 至少写 <code>title</code>，可选 <code>description</code>、<code>date</code>、<code>category</code>、<code>tags</code>。构建时会自动出现在文章列表、分类页、RSS 与搜索索引里。',
+	},
+	{
+		q: 'category 应该填什么？',
+		a: '填左侧导航里叶子节点的 <code>path</code> 片段，例如 <code>physics-e</code>、<code>container</code>、<code>game-guides</code>。分类页会用这个值来筛选文章，填错则只会出现在文章列表里。',
+	},
+	{
+		q: '上下篇是怎么来的？',
+		a: '默认按发布日期自动推导：上一篇是更新的文章，下一篇是更早的文章。也可以在 frontmatter 里用 <code>prev</code> / <code>next</code> 手动覆盖。',
+	},
+	{
+		q: '深色模式会记住吗？',
+		a: '会。首次访问跟随系统的 <code>prefers-color-scheme</code>，点击右上角图标切换后会写入 <code>localStorage</code>，并在页面绘制前应用，所以不会出现白屏闪烁。',
+	},
+	{
+		q: '导航结构在哪里改？',
+		a: '只改一处：<code>src/config/menu.js</code>。侧边栏、顶栏面包屑、分类页路由和搜索索引都由它派生。带 <code>dedicated: true</code> 的节点表示它自己有页面，不会再生成兜底的分类路由。',
+	},
+	{
+		q: '怎么本地预览与构建？',
+		a: '<code>pnpm dev</code> 启动开发服务器，<code>pnpm build</code> 生成静态产物到 <code>dist/</code>，<code>pnpm preview</code> 在本地校验构建结果。',
+	},
+];
 ---
 
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title="常见问题" />
-</head>
-<body>
-  <Header />
+<BaseLayout title="常见问题" description="关于本站内容组织、导航配置与构建部署的常见问题。">
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<span aria-current="page">常见问题</span>
+	</nav>
 
-  <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
-    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">常见问题</h1>
-    <div style="line-height:1.8; font-size:1rem; color:#eee;">
-      <p>在这里写你的常见问题内容。</p>
-    </div>
-  </main>
+	<div class="page-head">
+		<span class="page-head__eyebrow badge">独立页面</span>
+		<h1 class="page-title">常见问题</h1>
+		<p class="page-desc">关于内容组织、导航配置与构建部署的说明。点击问题即可展开。</p>
+	</div>
 
-  <Footer />
-</body>
-</html>
+	<div class="stack">
+		{
+			FAQS.map((item, index) => (
+				<details class="faq-item reveal" style={`transition-delay:${Math.min(index * 40, 200)}ms`}>
+					<summary>{item.q}</summary>
+					<div class="faq-item__body" set:html={item.a} />
+				</details>
+			))
+		}
+	</div>
+
+	<div class="card card--pad faq-foot reveal">
+		<h2 class="section-heading">还有其他问题？</h2>
+		<p class="page-desc faq-foot__desc">可以到 GitHub 提 Issue，或在关于页找到其他联系方式。</p>
+		<div class="row">
+			<a class="btn btn--accent" href="https://github.com/moyingyilang" target="_blank" rel="noopener noreferrer">
+				GitHub Issues
+			</a>
+			<a class="btn" href="/about">关于本站</a>
+		</div>
+	</div>
+</BaseLayout>
+
+<style>
+	.faq-foot__desc {
+		margin: 0.6rem 0 1.1rem;
+		font-size: 0.94rem;
+	}
+</style>

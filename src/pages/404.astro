@@ -1,0 +1,47 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="页面不存在" description="没有找到你要访问的页面。">
+	<section class="card card--pad notfound reveal">
+		<p class="notfound__code text-gradient" aria-hidden="true">404</p>
+		<h1 class="page-title">这个页面不见了</h1>
+		<p class="page-desc">
+			链接可能已经调整，或者内容还没写。可以从下面的入口继续，或者用搜索直接找。
+		</p>
+		<div class="row notfound__actions">
+			<button type="button" class="btn btn--accent" id="notfoundSearch">搜索全站</button>
+			<a class="btn" href="/">回到首页</a>
+			<a class="btn btn--ghost" href="/blog">文章列表</a>
+		</div>
+	</section>
+</BaseLayout>
+
+<script>
+	document.getElementById('notfoundSearch')?.addEventListener('click', () => {
+		document.getElementById('searchOpen')?.click();
+	});
+</script>
+
+<style>
+	.notfound {
+		text-align: center;
+		align-items: center;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.notfound__code {
+		font-family: var(--font-display);
+		font-size: clamp(3.5rem, 14vw, 7rem);
+		font-weight: 700;
+		line-height: 1;
+		margin: 0 0 0.5rem;
+		letter-spacing: -0.04em;
+	}
+
+	.notfound__actions {
+		justify-content: center;
+		margin-top: 1.4rem;
+	}
+</style>

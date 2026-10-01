@@ -1,44 +1,123 @@
 ---
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import BaseHead from '../components/BaseHead.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE_AUTHOR, SITE_DESCRIPTION, SITE_TITLE, SOCIAL_LINKS } from '../consts';
+
+const STACK = [
+	{ label: '框架', value: 'Astro 6（静态输出）' },
+	{ label: '内容', value: 'Content Collections + MDX' },
+	{ label: '样式', value: '原生 CSS 设计令牌，无 UI 框架' },
+	{ label: '视觉', value: 'Fluent Acrylic / Mica × MIUI 玻璃' },
+	{ label: '交互', value: '浅色 / 深色切换、命令面板搜索' },
+	{ label: '部署', value: 'GitHub Pages' },
+];
 ---
 
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title="关于本站" />
-  <style>
-    /* 🔥 强制 About 页面为单列，杜绝任何奇怪的浮动布局 */
-    .about-page {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 3rem 1rem;
-      box-sizing: border-box;
-    }
-    .about-title {
-      font-size: clamp(1.8rem, 5vw, 3rem);
-      font-weight: bold;
-      margin: 0 0 2rem;
-      color: #000;
-    }
-    .about-content {
-      font-size: 1.1rem;
-      line-height: 1.8;
-      color: #333;
-    }
-  </style>
-</head>
-<body>
-  <Header />
+<BaseLayout title="关于" description={SITE_DESCRIPTION}>
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<span aria-current="page">关于</span>
+	</nav>
 
-  <main class="about-page">
-    <h1 class="about-title">关于本站</h1>
-    <div class="about-content">
-      <p>这里写你的关于页面内容。</p>
-      </div>
-  </main>
+	<div class="page-head">
+		<span class="page-head__eyebrow badge">独立页面</span>
+		<h1 class="page-title">关于本站</h1>
+		<p class="page-desc">{SITE_DESCRIPTION}</p>
+	</div>
 
-  <Footer />
-</body>
-</html>
+	<section class="card card--pad reveal">
+		<div class="prose">
+			<h2>这个站是做什么的</h2>
+			<p>
+				{SITE_TITLE} 是一个用来沉淀技术笔记与项目记录的个人文档站。内容以编程、系统优化、硬件与刷机实践为主，
+				目标是「写得少一点，但每次都能查到」。
+			</p>
+
+			<h2>内容怎么组织</h2>
+			<p>
+				左侧导航就是目录树，分为科创、代码、小知识/随笔三个板块，外加杂项工具、常见问题、关于三个独立页面。
+				每篇文章通过 frontmatter 的 <code>category</code> 归属到对应分类，分类页会自动汇总。
+			</p>
+		</div>
+	</section>
+
+	<section class="stack">
+		<h2 class="section-heading">技术栈</h2>
+		<div class="card card--pad reveal">
+			<dl class="stack-list">
+				{
+					STACK.map((item) => (
+						<div class="stack-list__row">
+							<dt>{item.label}</dt>
+							<dd>{item.value}</dd>
+						</div>
+					))
+				}
+			</dl>
+		</div>
+	</section>
+
+	<section class="stack">
+		<h2 class="section-heading">联系方式</h2>
+		<div class="card card--pad reveal">
+			<p class="page-desc contact__lead">欢迎交流，也可以在 GitHub 提 Issue。</p>
+			<div class="row">
+				{
+					SOCIAL_LINKS.map((link) => (
+						<a class="btn" href={link.href} target="_blank" rel="noopener noreferrer">
+							{link.label}
+						</a>
+					))
+				}
+				<a class="btn btn--ghost" href="/rss.xml">RSS 订阅</a>
+			</div>
+		</div>
+	</section>
+
+	<p class="muted about-foot">&copy; {new Date().getFullYear()} {SITE_AUTHOR}</p>
+</BaseLayout>
+
+<style>
+	.stack-list {
+		margin: 0;
+		display: grid;
+		gap: 0.1rem;
+	}
+
+	.stack-list__row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.5rem;
+		padding: 0.65rem 0;
+		border-bottom: 1px solid var(--stroke);
+	}
+
+	.stack-list__row:last-child {
+		border-bottom: none;
+	}
+
+	.stack-list__row dt {
+		min-width: 5.5rem;
+		font-size: 0.85rem;
+		color: var(--text-tertiary);
+	}
+
+	.stack-list__row dd {
+		margin: 0;
+		flex: 1;
+		min-width: 12rem;
+		color: var(--text-secondary);
+		font-size: 0.92rem;
+	}
+
+	.contact__lead {
+		margin: 0 0 1rem;
+		font-size: 0.94rem;
+	}
+
+	.about-foot {
+		margin: 0.5rem 0 0;
+		font-size: 0.8rem;
+		text-align: center;
+	}
+</style>

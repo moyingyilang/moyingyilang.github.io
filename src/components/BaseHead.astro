@@ -1,26 +1,85 @@
 ---
-// Import the global.css file here so that it is included on
-// all pages through the use of the <BaseHead /> component.
 import '../styles/global.css';
 import type { ImageMetadata } from 'astro';
 import FallbackImage from '../assets/blog-placeholder-1.jpg';
-import { SITE_TITLE } from '../consts';
-import { Font } from 'astro:assets';
+import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
 
 interface Props {
 	title: string;
-	description: string;
+	description?: string;
 	image?: ImageMetadata;
+	type?: 'website' | 'article';
+	/** 为 true 时标题不再拼接站点名（首页用） */
+	bare?: boolean;
 }
 
-const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const {
+	title,
+	description = SITE_DESCRIPTION,
+	image = FallbackImage,
+	type = 'website',
+	bare = false,
+} = Astro.props;
 
-const { title, description, image = FallbackImage } = Astro.props;
+const pageTitle = bare || title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(image.src, Astro.site ?? Astro.url);
 ---
 
-<!-- Global Metadata -->
+<!-- 尽早确定主题，避免深色模式下的白屏闪烁 -->
+<script is:inline>
+	(() => {
+		const KEY = 'moying-theme';
+		let theme = null;
+		try {
+			theme = localStorage.getItem(KEY);
+		} catch (e) {
+			/* 隐私模式下忽略 */
+		}
+		if (theme !== 'light' && theme !== 'dark') {
+			theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+		}
+		document.documentElement.dataset.theme = theme;
+		// 供 CSS 判断「JS 可用」，避免禁用 JS 时入场动画把内容永久隐藏
+		document.documentElement.classList.add('js');
+
+		// 壁纸：用上次的图片直接绘制，避免刷新时先闪一下内置渐变
+		try {
+			const raw = localStorage.getItem('moying-wallpaper');
+			if (raw) {
+				const wp = JSON.parse(raw);
+				const el = document.documentElement;
+				if (wp.mode && wp.mode !== 'off') {
+					const url =
+						typeof wp.lastUrl === 'string' && /^https:\/\//i.test(wp.lastUrl)
+							? wp.lastUrl.replace(/["'()\\\s<>]/g, '')
+							: '';
+					if (url) el.style.setProperty('--wallpaper-image', `url("${url}")`);
+					el.style.setProperty('--wallpaper-blur', `${Number(wp.blur) || 0}px`);
+					el.style.setProperty('--wallpaper-dim', String(Number(wp.dim) || 0));
+					if (wp.kenBurns) el.classList.add('wallpaper-kenburns');
+				}
+			}
+		} catch (e) {
+			/* 数据损坏时忽略，回落到内置渐变 */
+		}
+
+		// 若交互脚本（SiteScripts）没能执行，2 秒后强制显示所有入场元素
+		window.__revealReady = false;
+		window.setTimeout(() => {
+			if (!window.__revealReady) {
+				document.documentElement.classList.add('reveal-fallback');
+			}
+		}, 2000);
+	})();
+</script>
+
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#eef3fc" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0a0e1a" media="(prefers-color-scheme: dark)" />
+
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" href="/favicon.ico" />
 <link rel="sitemap" href="/sitemap-index.xml" />
@@ -32,26 +91,22 @@ const { title, description, image = FallbackImage } = Astro.props;
 />
 <meta name="generator" content={Astro.generator} />
 
-<Font cssVariable="--font-atkinson" preload />
-
-<!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
 
-<!-- Primary Meta Tags -->
-<title>{title}</title>
-<meta name="title" content={title} />
+<title>{pageTitle}</title>
+<meta name="title" content={pageTitle} />
 <meta name="description" content={description} />
 
-<!-- Open Graph / Facebook -->
-<meta property="og:type" content="website" />
-<meta property="og:url" content={Astro.url} />
-<meta property="og:title" content={title} />
+<meta property="og:type" content={type} />
+<meta property="og:url" content={canonicalURL} />
+<meta property="og:title" content={pageTitle} />
 <meta property="og:description" content={description} />
-<meta property="og:image" content={new URL(image.src, Astro.url)} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:site_name" content={SITE_TITLE} />
+<meta property="og:locale" content="zh_CN" />
 
-<!-- Twitter -->
-<meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:url" content={Astro.url} />
-<meta property="twitter:title" content={title} />
-<meta property="twitter:description" content={description} />
-<meta property="twitter:image" content={new URL(image.src, Astro.url)} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:url" content={canonicalURL} />
+<meta name="twitter:title" content={pageTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImage} />

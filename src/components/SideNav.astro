@@ -1,0 +1,45 @@
+---
+import { MENU_DATA, findMenuTrail, normalizePath } from '../config/menu.js';
+import NavTree from './NavTree.astro';
+
+const pathname = normalizePath(Astro.url.pathname);
+const trailHrefs = findMenuTrail(pathname).map((node) => node.href);
+---
+
+<aside class="sidenav glass" id="sidenav" aria-label="站点导航">
+	<p class="sidenav__title">文档导航</p>
+	<NavTree items={MENU_DATA} trailHrefs={trailHrefs} />
+
+	<div class="sidenav__foot">
+		<a href="/blog" class="sidenav__foot-link">文章列表</a>
+		<a href="/rss.xml" class="sidenav__foot-link">RSS</a>
+	</div>
+</aside>
+
+<style>
+	.sidenav__foot {
+		margin-top: auto;
+		padding-top: 0.9rem;
+		margin-top: 0.9rem;
+		border-top: 1px solid var(--stroke);
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	.sidenav__foot-link {
+		font-size: 0.78rem;
+		color: var(--text-tertiary);
+		padding: 0.28rem 0.6rem;
+		border-radius: var(--r-pill);
+		border: 1px solid var(--stroke);
+		transition: all var(--dur-fast) var(--ease-standard);
+	}
+
+	.sidenav__foot-link:hover {
+		color: var(--accent);
+		border-color: var(--accent);
+		background: var(--accent-soft);
+		text-decoration: none;
+	}
+</style>

@@ -1,253 +1,140 @@
 ---
 import { SITE_TITLE } from '../consts';
-import HeaderLink from './HeaderLink.astro';
-import { MENU_DATA } from '../config/menu.js';
+import { findMenuTrail, normalizePath } from '../config/menu.js';
+import ThemeToggle from './ThemeToggle.astro';
 
-function findActiveItem(items, currentPath, parent = null) {
-  for (const item of items) {
-    const fullPath = parent ? `${parent}/${item.path}` : `/${item.path}`;
-    if (fullPath === currentPath) {
-      return { item, parent, fullPath };
-    }
-    if (item.children) {
-      const found = findActiveItem(item.children, currentPath, fullPath);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-const currentPath = import.meta.env.SSR ? '' : window.location.pathname;
-const activeInfo = currentPath ? findActiveItem(MENU_DATA, currentPath) : null;
+// 构建期就算好当前路径，静态托管下高亮才有效
+const pathname = normalizePath(Astro.url.pathname);
+const trail = findMenuTrail(pathname);
 ---
 
-<header class="navbar">
-  <div class="navbar-content">
-    <button class="menu-toggle" id="menuToggle" aria-label="菜单开关">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
-    <a href="/" class="logo">{SITE_TITLE}</a>
-  </div>
+<header class="appbar">
+	<div class="appbar__inner">
+		<button
+			type="button"
+			class="btn btn--icon drawer-toggle"
+			id="drawerToggle"
+			aria-label="打开导航"
+			aria-expanded="false"
+			aria-controls="sidenav"
+		>
+			<svg
+				class="drawer-toggle__open"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
+				<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path>
+			</svg>
+			<svg
+				class="drawer-toggle__close"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				aria-hidden="true"
+			>
+				<path d="M6 6l12 12"></path><path d="M18 6L6 18"></path>
+			</svg>
+		</button>
+
+		<a href="/" class="appbar__brand">
+			<span class="appbar__mark" aria-hidden="true">路</span>
+			<span>{SITE_TITLE}</span>
+		</a>
+
+		{
+			trail.length > 0 && (
+				<nav class="appbar__crumbs" aria-label="面包屑">
+					<a href="/">首页</a>
+					{trail.map((node, i) => (
+						<>
+							<span class="sep" aria-hidden="true">/</span>
+							{i === trail.length - 1 ? (
+								<span aria-current="page">{node.label}</span>
+							) : (
+								<a href={node.href}>{node.label}</a>
+							)}
+						</>
+					))}
+				</nav>
+			)
+		}
+
+		<div class="appbar__spacer"></div>
+
+		<button type="button" class="btn search-btn" id="searchOpen" aria-label="搜索文档" aria-haspopup="dialog">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+				<circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" />
+			</svg>
+			<span class="search-btn__label">搜索</span>
+			<kbd class="search-btn__kbd" data-search-kbd>Ctrl K</kbd>
+		</button>
+
+		<button
+			type="button"
+			class="btn btn--icon"
+			id="settingsOpen"
+			aria-label="壁纸与外观设置"
+			title="壁纸与外观设置"
+			aria-haspopup="dialog"
+		>
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.7"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<circle cx="12" cy="12" r="3.2"></circle>
+				<path
+					d="M19.1 14.6a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.55V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.24 15a1.7 1.7 0 0 0-1.55-1.03H2.6a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.24 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 8.6 4.54h.08A1.7 1.7 0 0 0 9.71 3V2.9a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1.03 1.54 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1.03h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.55 1.03z"
+				></path>
+			</svg>
+		</button>
+
+		<ThemeToggle />
+	</div>
 </header>
 
-<aside class="sidebar" id="sidebar">
-  <nav class="sidebar-nav">
-    {MENU_DATA.map((item) => {
-      const itemPath = `/${item.path}`;
-      const isParentActive = activeInfo?.parent?.startsWith(itemPath);
-      return (
-        <li class={`${item.children ? 'has-submenu' : ''} ${isParentActive ? 'active' : ''}`}>
-          {item.children
-            ? <a href="#">{item.label}</a>
-            : <HeaderLink href={itemPath} class={activeInfo?.fullPath === itemPath ? 'active' : ''}>{item.label}</HeaderLink>
-          }
-          {item.children && (
-            <ul class="submenu">
-              {item.children.map((child) => {
-                const childPath = `${itemPath}/${child.path}`;
-                const isChildActive = activeInfo?.fullPath === childPath;
-                const isGrandparentActive = activeInfo?.parent?.startsWith(childPath);
-                return (
-                  <li class={`${child.children ? 'has-submenu' : ''} ${isChildActive || isGrandparentActive ? 'active' : ''}`}>
-                    {child.children
-                      ? <a href="#">{child.label}</a>
-                      : <HeaderLink href={childPath} class={isChildActive ? 'active' : ''}>{child.label}</HeaderLink>
-                    }
-                    {child.children && (
-                      <ul class="submenu">
-                        {child.children.map((sub) => {
-                          const subPath = `${childPath}/${sub.path}`;
-                          const isSubActive = activeInfo?.fullPath === subPath;
-                          return (
-                            <li>
-                              <HeaderLink href={subPath} class={isSubActive ? 'active' : ''}>{sub.label}</HeaderLink>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </li>
-      );
-    })}
-  </nav>
-</aside>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const menuToggle = document.getElementById('menuToggle');
-  const sidebar = document.getElementById('sidebar');
-  const submenuParents = document.querySelectorAll('.has-submenu > a');
-
-  menuToggle.addEventListener('click', () => {
-    menuToggle.classList.toggle('active');
-    sidebar.classList.toggle('active');
-    document.body.classList.toggle('sidebar-open');
-  });
-
-  submenuParents.forEach(toggle => {
-    toggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      const parent = toggle.parentElement;
-      const isActive = parent.classList.contains('active');
-      document.querySelectorAll('.has-submenu').forEach(el => el.classList.remove('active'));
-      if (!isActive) parent.classList.add('active');
-    });
-  });
-
-  document.addEventListener('click', (e) => {
-    if (sidebar.classList.contains('active') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
-      menuToggle.classList.remove('active');
-      sidebar.classList.remove('active');
-      document.body.classList.remove('sidebar-open');
-    }
-  });
-
-  let touchStartX = 0;
-  document.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].clientX);
-  document.addEventListener('touchend', e => {
-    const diff = e.changedTouches[0].clientX - touchStartX;
-    if (diff > 50 && sidebar.classList.contains('active')) {
-      menuToggle.classList.remove('active');
-      sidebar.classList.remove('active');
-      document.body.classList.remove('sidebar-open');
-    }
-  });
-});
-</script>
-
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  transition: padding 0.3s ease;
-}
-body.sidebar-open {
-  overflow: hidden;
-}
-.navbar {
-  background: #1a1b2e;
-  padding: 1rem 1.5rem;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-}
-.navbar-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.logo {
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-.menu-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  position: relative;
-}
-.menu-toggle span {
-  position: absolute;
-  height: 2px;
-  width: 24px;
-  background: rgba(255,255,255,0.9);
-  left: 50%;
-  transform: translateX(-50%);
-  transition: all 0.3s ease;
-  border-radius: 2px;
-}
-.menu-toggle span:nth-child(1) { top: 10px; }
-.menu-toggle span:nth-child(2) { top: 16px; }
-.menu-toggle span:nth-child(3) { top: 22px; }
-.menu-toggle.active span:nth-child(1) { transform: translate(-50%, 6px) rotate(45deg); }
-.menu-toggle.active span:nth-child(2) { opacity: 0; }
-.menu-toggle.active span:nth-child(3) { transform: translate(-50%, -6px) rotate(-45deg); }
+	.search-btn {
+		border-radius: var(--r-pill);
+		padding: 0.4rem 0.75rem 0.4rem 0.6rem;
+		color: var(--text-secondary);
+	}
 
-.sidebar {
-  position: fixed;
-  top: 65px;
-  left: 0;
-  width: 280px;
-  height: calc(100vh - 65px);
-  background: #f7f8fa;
-  border-right: 1px solid #eaeef5;
-  padding: 1.5rem;
-  transform: translateX(-100%);
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 999;
-  box-shadow: 2px 0 15px rgba(0,0,0,0.04);
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
-.sidebar::-webkit-scrollbar { width: 4px; }
-.sidebar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
-.sidebar.active { transform: translateX(0); }
-.sidebar-nav {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.sidebar-nav li { width: 100%; }
-.sidebar-nav a {
-  color: #374151;
-  text-decoration: none;
-  padding: 0.75rem 1rem;
-  display: block;
-  border-radius: 10px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-.sidebar-nav a:hover,
-.sidebar-nav a.active {
-  background: #eef1f7;
-  color: #1a1b2e;
-  transform: translateX(2px);
-}
-.has-submenu > a::after {
-  content: "▸";
-  float: right;
-  transition: transform 0.25s ease;
-  font-size: 0.85rem;
-  color: #6b7280;
-}
-.has-submenu.active > a::after {
-  transform: rotate(90deg);
-}
-.submenu {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.4s ease;
-  padding-left: 0.8rem;
-  margin-top: 0.2rem;
-}
-.has-submenu.active > .submenu {
-  max-height: 600px;
-}
+	.search-btn svg {
+		width: 16px;
+		height: 16px;
+		flex: none;
+	}
 
-@media (min-width: 992px) {
-  .sidebar { transform: translateX(0); }
-  .menu-toggle { display: none; }
-  body.sidebar-open { padding-left: 280px; }
-}
+	.search-btn__label {
+		font-size: 0.85rem;
+	}
+
+	.search-btn__kbd {
+		font-size: 0.68rem;
+		color: var(--text-tertiary);
+	}
+
+	/* 抽屉开关在开合之间切换图标 */
+	.drawer-toggle__close {
+		display: none;
+	}
+
+	:global(body.is-drawer-open) .drawer-toggle__open {
+		display: none;
+	}
+
+	:global(body.is-drawer-open) .drawer-toggle__close {
+		display: block;
+	}
 </style>

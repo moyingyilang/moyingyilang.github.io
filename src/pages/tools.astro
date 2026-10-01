@@ -1,24 +1,92 @@
 ---
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import BaseHead from '../components/BaseHead.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const TOOLS = [
+	{
+		title: '站内搜索',
+		desc: '按标题、描述与分类检索全站内容，支持键盘操作。',
+		href: '#',
+		action: 'search',
+		badge: 'Ctrl + K',
+	},
+	{
+		title: 'RSS 订阅',
+		desc: '用任意阅读器订阅本站更新，只包含正式发布的文章。',
+		href: '/rss.xml',
+		badge: 'XML',
+	},
+	{
+		title: '站点地图',
+		desc: '提交给搜索引擎的全站 URL 索引，构建时自动生成。',
+		href: '/sitemap-index.xml',
+		badge: 'XML',
+	},
+	{
+		title: '文章归档',
+		desc: '按时间倒序浏览全部文章，带分类与阅读时长标注。',
+		href: '/blog',
+		badge: '列表',
+	},
+];
 ---
 
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title="工具" />
-</head>
-<body>
-  <Header />
+<BaseLayout title="杂项工具" description="本站提供的检索、订阅与索引等实用入口。">
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<span aria-current="page">杂项工具</span>
+	</nav>
 
-  <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
-    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">工具</h1>
-    <div style="line-height:1.8; font-size:1rem; color:#eee;">
-      <p>这里写工具页面内容。</p>
-    </div>
-  </main>
+	<div class="page-head">
+		<span class="page-head__eyebrow badge">独立页面</span>
+		<h1 class="page-title">杂项工具</h1>
+		<p class="page-desc">本站已经可用的检索、订阅与索引入口，后续会继续补充自用的小工具。</p>
+	</div>
 
-  <Footer />
-</body>
-</html>
+	<div class="grid grid--2">
+		{
+			TOOLS.map((tool, index) => (
+				<a
+					class="card reveal"
+					href={tool.href}
+					data-tool={tool.action ?? undefined}
+					style={`transition-delay:${Math.min(index * 45, 220)}ms`}
+				>
+					<span class="card__arrow">→</span>
+					<div class="tool__head">
+						<h2 class="card__title">{tool.title}</h2>
+						<span class="badge badge--muted">{tool.badge}</span>
+					</div>
+					<p class="card__desc">{tool.desc}</p>
+				</a>
+			))
+		}
+	</div>
+
+	<div class="empty-state reveal">
+		<p class="empty-state__icon" aria-hidden="true">🧰</p>
+		<p>更多工具正在整理中。</p>
+	</div>
+</BaseLayout>
+
+<script>
+	// 「站内搜索」卡片直接唤起搜索面板，而不是做一次无效跳转
+	document.querySelector('[data-tool="search"]')?.addEventListener('click', (event) => {
+		event.preventDefault();
+		document.getElementById('searchOpen')?.click();
+	});
+</script>
+
+<style>
+	.tool__head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-bottom: 0.35rem;
+	}
+
+	.tool__head .card__title {
+		margin: 0;
+	}
+</style>

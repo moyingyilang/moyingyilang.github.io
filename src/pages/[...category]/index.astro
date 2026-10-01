@@ -1,77 +1,122 @@
 ---
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
-import BaseHead from '../../components/BaseHead.astro';
-import { MENU_DATA } from '../../config/menu.js';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { categoryPaths, findMenuTrail, flattenMenu, normalizePath } from '../../config/menu.js';
+import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
 
 export const prerender = true;
 
+/**
+ * 只为本就存在独立页面的节点之外的分类生成路由。
+ * 菜单里的 dedicated 节点（tools / faq / about）有自己的 .astro，
+ * 若一并生成会产出同一 URL 并在构建时冲突。
+ */
 export async function getStaticPaths() {
-  function getAllPaths(menu, parentPath = '') {
-    let paths = [];
-    for (const item of menu) {
-      const fullPath = parentPath ? `${parentPath}/${item.path}` : item.path;
-      paths.push(fullPath);
-      if (item.children?.length) {
-        paths = paths.concat(getAllPaths(item.children, fullPath));
-      }
-    }
-    return paths;
-  }
-
-  const allPaths = getAllPaths(MENU_DATA);
-  return allPaths.map(path => ({ params: { category: path } }));
+	return categoryPaths().map((category) => ({ params: { category } }));
 }
 
-const { category } = Astro.params;
-const paths = category ? category.split('/').filter(Boolean) : [];
+const pathname = normalizePath(Astro.url.pathname);
+const trail = findMenuTrail(pathname);
+const nodes = flattenMenu();
+const self = nodes.find((node) => node.href === pathname) ?? null;
 
-function findLabels(segments) {
-  let currentList = MENU_DATA;
-  const labels = [];
-  for (const seg of segments) {
-    const item = currentList.find(x => x.path === seg);
-    if (item) {
-      labels.push(item.label);
-      currentList = item.children || [];
-    } else break;
-  }
-  return labels;
-}
+const children = self
+	? nodes.filter((node) => node.depth === self.depth + 1 && node.href.startsWith(`${pathname}/`))
+	: [];
 
-const titleParts = findLabels(paths);
-const pageTitle = titleParts.join(' · ') || '分类';
-const currentCat = paths.at(-1);
+const title = self?.label ?? trail.at(-1)?.label ?? '分类';
+const segment = pathname.split('/').filter(Boolean).pop();
 
-const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
-  .map(([f, mod]) => ({
-    slug: f.split('/').pop()?.replace(/\.mdx$/,''),
-    ...mod.frontmatter
-  }))
-  .filter(p => p.category === currentCat);
+const posts = await getSortedPosts();
+const matched = posts.filter((post) => post.data.category === segment);
 ---
 
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title={pageTitle} />
-</head>
-<body>
-  <Header />
-  <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
-    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">{pageTitle}</h1>
-    {posts.length ? (
-      <div style="margin-top:2rem; display:flex; flex-direction:column; gap:1.2rem;">
-        {posts.map(post => (
-          <a href={`/${post.slug}`} style="display:block; padding:1.2rem 1.5rem; border-radius:10px; background:rgba(255,255,255,0.04); text-decoration:none; color:inherit;">
-            <h2 style="margin:0; font-size:1.25rem;">{post.title}</h2>
-          </a>
-        ))}
-      </div>
-    ) : (
-      <div style="margin-top:4rem; text-align:left; font-size:1rem; color:#888;">该分类下暂无文章</div>
-    )}
-  </main>
-  <Footer />
-</body>
-</html>
+<BaseLayout title={title} description={`${title} 分类下的全部文档与文章。`}>
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		{
+			trail.map((node, index) => (
+				<>
+					<span class="sep" aria-hidden="true">/</span>
+					{index === trail.length - 1 ? (
+						<span aria-current="page">{node.label}</span>
+					) : (
+						<a href={node.href}>{node.label}</a>
+					)}
+				</>
+			))
+		}
+	</nav>
+
+	<div class="page-head">
+		<span class="page-head__eyebrow badge">分类</span>
+		<h1 class="page-title">{title}</h1>
+		<p class="page-desc">
+			{matched.length > 0 ? `该分类下有 ${matched.length} 篇文章。` : '该分类下暂无文章，以下是它的子分类。'}
+		</p>
+	</div>
+
+	{
+		children.length > 0 && (
+			<section class="stack">
+				<h2 class="section-heading">子分类</h2>
+				<div class="grid grid--auto">
+					{children.map((child, index) => {
+						const count = posts.filter((post) => post.data.category === child.path).length;
+						return (
+							<a
+								class="card reveal"
+								href={child.href}
+								style={`transition-delay:${Math.min(index * 40, 200)}ms`}
+							>
+								<span class="card__arrow">→</span>
+								<h3 class="card__title">{child.label}</h3>
+								<p class="card__meta">
+									<span>{count > 0 ? `${count} 篇文章` : '暂无文章'}</span>
+								</p>
+							</a>
+						);
+					})}
+				</div>
+			</section>
+		)
+	}
+
+	{
+		matched.length > 0 ? (
+			<section class="stack">
+				<h2 class="section-heading">本分类文章</h2>
+				<div class="stack">
+					{matched.map((post, index) => {
+						const cat = categoryOf(post);
+						return (
+							<a
+								class="card reveal"
+								href={postHref(post)}
+								style={`transition-delay:${Math.min(index * 40, 200)}ms`}
+							>
+								<span class="card__arrow">→</span>
+								<h3 class="card__title">{post.data.title}</h3>
+								{post.data.description && <p class="card__desc">{post.data.description}</p>}
+								<p class="card__meta">
+									{cat && cat.href !== pathname && <span class="badge">{cat.label}</span>}
+									<span>{formatDate(post.data.date ?? post.data.pubDate)}</span>
+									<span>· {readingTime(post.body)}</span>
+								</p>
+							</a>
+						);
+					})}
+				</div>
+			</section>
+		) : (
+			children.length === 0 && (
+				<div class="empty-state">
+					<p class="empty-state__icon" aria-hidden="true">🗂️</p>
+					<p>
+						该分类下暂无文章。给文章的 frontmatter 加上
+						<code>category: {segment}</code> 即可出现在这里。
+					</p>
+				</div>
+			)
+		)
+	}
+</BaseLayout>

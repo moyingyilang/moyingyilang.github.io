@@ -1,57 +1,56 @@
 ---
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
-import BaseHead from '../../components/BaseHead.astro';
-import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
 
-const posts = await getCollection('blog');
+const posts = await getSortedPosts();
+const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 ---
 
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title="文章列表" />
-</head>
-<body>
-  <Header />
-  <main class="blog-list">
-    <h1>文章列表</h1>
-    <ul class="post-list">
-      {posts.map(post => (
-        <li>
-          <a href={`/blog/${post.slug}`}>{post.data.title}</a>
-          <span>{post.data.date}</span>
-        </li>
-      ))}
-    </ul>
-  </main>
-  <Footer />
-</body>
-</html>
+<BaseLayout title="文章列表" description="全部文章按发布时间倒序归档。">
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<span aria-current="page">文章列表</span>
+	</nav>
 
-<style>
-.blog-list {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-.post-list {
-  list-style: none;
-  padding: 0;
-  margin: 2rem 0;
-}
-.post-list li {
-  margin: 1rem 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background: rgba(255,255,255,.03);
-  border-radius: 10px;
-}
-.post-list a {
-  color: inherit;
-  text-decoration: none;
-  font-weight: 500;
-}
-</style>
+	<div class="page-head">
+		<h1 class="page-title">文章列表</h1>
+		<p class="page-desc">
+			共 {posts.length} 篇文章、{tagCount} 个标签，按发布时间倒序排列。
+		</p>
+	</div>
+
+	{
+		posts.length > 0 ? (
+			<div class="stack">
+				{posts.map((post, index) => {
+					const cat = categoryOf(post);
+					return (
+						<a
+							class="card reveal"
+							href={postHref(post)}
+							style={`transition-delay:${Math.min(index * 40, 200)}ms`}
+						>
+							<span class="card__arrow">→</span>
+							<h2 class="card__title">{post.data.title}</h2>
+							{post.data.description && <p class="card__desc">{post.data.description}</p>}
+							<p class="card__meta">
+								{cat && <span class="badge">{cat.label}</span>}
+								<span>{formatDate(post.data.date ?? post.data.pubDate)}</span>
+								<span>· {readingTime(post.body)}</span>
+								{(post.data.tags ?? []).map((tag) => (
+									<span class="badge badge--muted">{tag}</span>
+								))}
+							</p>
+						</a>
+					);
+				})}
+			</div>
+		) : (
+			<div class="empty-state">
+				<p class="empty-state__icon" aria-hidden="true">📄</p>
+				<p>还没有文章，往 <code>src/content/blog/</code> 里添加第一个 <code>.mdx</code> 吧。</p>
+			</div>
+		)
+	}
+</BaseLayout>

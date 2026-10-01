@@ -1,51 +1,142 @@
 ---
-import Header from '../../components/Header.astro';
-import Footer from '../../components/Footer.astro';
-import BaseHead from '../../components/BaseHead.astro';
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
 
-export function getStaticPaths() {
-  const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
-    .map(([f, mod]) => ({
-      slug: f.split('/').pop()?.replace(/\.mdx$/, ''),
-    }));
-
-  return posts.map(post => ({
-    params: { slug: post.slug }
-  }));
+export async function getStaticPaths() {
+	const posts = await getSortedPosts();
+	return posts.map((post, index) => ({
+		params: { slug: post.id },
+		props: {
+			post,
+			// 列表按日期倒序，因此上一项是更新的文章
+			prev: posts[index + 1] ?? null,
+			next: posts[index - 1] ?? null,
+		},
+	}));
 }
 
-const posts = Object.entries(import.meta.glob('../../pages/blog/*.mdx', { eager: true }))
-  .map(([f, mod]) => ({
-    slug: f.split('/').pop()?.replace(/\.mdx$/, ''),
-    ...mod.frontmatter,
-    compiledContent: mod.compiledContent,
-  }));
+const { post, prev, next } = Astro.props;
+const { Content, headings } = await render(post);
 
-const { slug } = Astro.params;
-const post = posts.find(p => p.slug === slug);
+const cat = categoryOf(post);
+const date = post.data.date ?? post.data.pubDate;
+const tags = post.data.tags ?? [];
 ---
 
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <BaseHead title={post?.title || '文章'} />
-</head>
-<body>
-  <Header />
+<BaseLayout
+	title={post.data.title}
+	description={post.data.description}
+	headings={headings}
+	type="article"
+>
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<a href="/blog">文章列表</a>
+		<span class="sep" aria-hidden="true">/</span>
+		{
+			cat && (
+				<>
+					<a href={cat.href}>{cat.label}</a>
+					<span class="sep" aria-hidden="true">/</span>
+				</>
+			)
+		}
+		<span aria-current="page">{post.data.title}</span>
+	</nav>
 
-  <main style="max-width:900px; margin:0 auto; padding:3rem 1rem;">
-    <h1 style="font-size:clamp(1.4rem, 4vw, 2rem); margin:0 0 2rem;">
-      {post?.title || '文章不存在'}
-    </h1>
-    <div style="line-height:1.8; font-size:1rem; color:#eee;">
-      {post ? (
-        <Fragment set:html={post.compiledContent || ''} />
-      ) : (
-        <p>文章未找到</p>
-      )}
-    </div>
-  </main>
+	<article class="card card--pad">
+		<header class="post-header">
+			<h1 class="page-title">{post.data.title}</h1>
+			{post.data.description && <p class="page-desc">{post.data.description}</p>}
 
-  <Footer />
-</body>
-</html>
+			<div class="card__meta post-meta">
+				{cat && <a class="badge" href={cat.href}>{cat.label}</a>}
+				<span>{formatDate(date)}</span>
+				<span>· {readingTime(post.body)}</span>
+				{post.data.updatedDate && <span>· 更新于 {formatDate(post.data.updatedDate)}</span>}
+			</div>
+
+			{
+				tags.length > 0 && (
+					<div class="row post-tags">
+						{tags.map((tag) => (
+							<span class="badge badge--muted">{tag}</span>
+						))}
+					</div>
+				)
+			}
+		</header>
+
+		<div class="prose">
+			<Content />
+		</div>
+	</article>
+
+	{
+		(prev || next) && (
+			<nav class="post-nav" aria-label="相邻文章">
+				{prev && (
+					<a class="card post-nav__item" href={postHref(prev)}>
+						<span class="post-nav__label">← 上一篇</span>
+						<span class="post-nav__title">{prev.data.title}</span>
+					</a>
+				)}
+				{next && (
+					<a class="card post-nav__item post-nav__item--end" href={postHref(next)}>
+						<span class="post-nav__label">下一篇 →</span>
+						<span class="post-nav__title">{next.data.title}</span>
+					</a>
+				)}
+			</nav>
+		)
+	}
+</BaseLayout>
+
+<style>
+	.post-header {
+		margin-bottom: 1.8rem;
+		padding-bottom: 1.4rem;
+		border-bottom: 1px solid var(--stroke);
+	}
+
+	.post-meta {
+		margin-top: 0.9rem;
+	}
+
+	.post-meta .badge:hover {
+		text-decoration: none;
+	}
+
+	.post-tags {
+		margin-top: 0.6rem;
+	}
+
+	.post-nav {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 1rem;
+	}
+
+	.post-nav__item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.post-nav__item--end {
+		text-align: right;
+	}
+
+	.post-nav__label {
+		font-size: 0.75rem;
+		letter-spacing: 0.05em;
+		color: var(--text-tertiary);
+	}
+
+	.post-nav__title {
+		font-weight: 550;
+		color: var(--text);
+	}
+</style>

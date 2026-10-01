@@ -1,0 +1,1019 @@
+---
+import { GAMES, MODES, availableGames, clientConfig } from '../config/wallpapers';
+
+/**
+ * 壁纸引擎与「外观设置」面板
+ *
+ * 只把元数据序列化给客户端脚本（游戏图集的实际图片直链在
+ * public/wallpaper-manifest.json 里按需加载，避免把 474 条 URL 内联进每个页面）。
+ */
+const config = clientConfig();
+const configJson = JSON.stringify(config).replace(/</g, '\\u003c');
+
+/** 取该游戏所有图集里最高的一档分辨率，避免文案过长把标签挤成竖排 */
+function bestResolution(game) {
+	const sizes = game.galleries.flatMap((gallery) => gallery.resolution.match(/\d+x\d+/g) || []);
+	const widest = sizes.map((size) => Number(size.split('x')[0])).sort((a, b) => b - a)[0];
+	return sizes.find((size) => Number(size.split('x')[0]) === widest) ?? '';
+}
+
+const gameRows = GAMES.map((game) => ({
+	id: game.id,
+	label: game.label,
+	note: game.note ?? '',
+	count: game.galleries.length,
+	best: bestResolution(game),
+}));
+
+const hasGameSources = availableGames().length > 0;
+const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0);
+---
+
+<div class="wallpaper-fade" id="wallpaperFade" aria-hidden="true"></div>
+
+<div class="settings" id="settings" role="dialog" aria-modal="true" aria-label="外观设置">
+	<div class="settings__scrim" data-settings-close></div>
+
+	<aside class="settings__panel">
+		<header class="settings__head">
+			<div>
+				<p class="settings__eyebrow">外观</p>
+				<h2 class="settings__title">壁纸设置</h2>
+			</div>
+			<button type="button" class="btn btn--icon" data-settings-close aria-label="关闭设置">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+					<path d="M6 6l12 12"></path><path d="M18 6L6 18"></path>
+				</svg>
+			</button>
+		</header>
+
+		<div class="settings__body">
+			<section class="set-group">
+				<h3 class="set-group__title">壁纸来源</h3>
+				<div class="set-options" id="modeList" role="radiogroup" aria-label="壁纸来源">
+					{
+						MODES.map((mode) => (
+							<label class="set-option" data-mode={mode.id}>
+								<input type="radio" name="wallpaper-mode" value={mode.id} />
+								<span class="set-option__body">
+									<span class="set-option__label">{mode.label}</span>
+									<span class="set-option__desc">{mode.desc}</span>
+								</span>
+								<span class="set-option__mark" aria-hidden="true" />
+							</label>
+						))
+					}
+				</div>
+			</section>
+
+			<section class="set-group">
+				<h3 class="set-group__title">
+					游戏图源
+					<span class="set-group__hint">选 1 个即「某游戏专属」，选多个即「多游戏专属」；与 Bing 互锁</span>
+				</h3>
+				<div class="set-games" id="gameList">
+					{
+						gameRows.map((game) => (
+							<label class:list={['set-game', game.count === 0 && 'is-disabled']} data-game={game.id}>
+								<input type="checkbox" value={game.id} disabled={game.count === 0} />
+								<span class="set-game__label">{game.label}</span>
+								<span class:list={['set-game__meta', game.count > 0 && 'is-ok']}>
+									{game.count > 0 ? `${game.count} 个图集 · 最高 ${game.best}` : '暂无可用图源'}
+								</span>
+								{game.count === 0 && game.note && <span class="set-game__note">{game.note}</span>}
+							</label>
+						))
+					}
+				</div>
+				{
+					!hasGameSources && (
+						<p class="set-note">游戏类图源正在接入中。</p>
+					)
+				}
+			</section>
+
+			<section class="set-group">
+				<h3 class="set-group__title">外观调整</h3>
+
+				<div class="set-row">
+					<label class="set-row__label" for="setBlur">
+						模糊
+						<span class="set-row__value" id="setBlurValue">0 px</span>
+					</label>
+					<input type="range" id="setBlur" min="0" max="24" step="1" />
+				</div>
+
+				<div class="set-row">
+					<label class="set-row__label" for="setDim">
+						压暗
+						<span class="set-row__value" id="setDimValue">12%</span>
+					</label>
+					<input type="range" id="setDim" min="0" max="0.6" step="0.02" />
+				</div>
+
+				<label class="set-switch">
+					<input type="checkbox" id="setKenBurns" />
+					<span class="set-switch__track" aria-hidden="true"><span class="set-switch__thumb" /></span>
+					<span class="set-switch__text">
+						缓慢缩放动效
+						<span class="set-switch__desc">64 秒一个来回，跟随系统「减少动态效果」自动关闭</span>
+					</span>
+				</label>
+			</section>
+
+			<section class="set-group">
+				<h3 class="set-group__title">自动更换</h3>
+				<div class="set-row">
+					<label class="set-row__label" for="setInterval">间隔</label>
+					<select id="setInterval" class="set-select">
+						<option value="0">关闭</option>
+						<option value="5">每 5 分钟</option>
+						<option value="15">每 15 分钟</option>
+						<option value="30">每 30 分钟</option>
+						<option value="60">每 1 小时</option>
+					</select>
+				</div>
+				<p class="set-note">自动更换只在当前页面停留期间生效，不会跨访问记录。</p>
+			</section>
+
+			<details class="set-details">
+				<summary>图源实测状态（{galleryTotal} 个游戏图集已接入）</summary>
+				<div class="set-details__body">
+					<p>本站是纯静态托管，没有后端，所有图源都由浏览器直接访问，因此只接入经实测可用的源。</p>
+					<p><b>可用</b></p>
+					<ul>
+						<li><b>Bing</b>：<code>bing.biturl.top</code>，200 JSON 且 CORS 为 <code>*</code>。</li>
+						<li>
+							<b>二次元</b>：<code>t.alcy.cc</code>、<code>t.mwm.moe</code> 直接返回图片，
+							作为背景图使用不需要 CORS，每次请求均为不同图。
+						</li>
+						<li>
+							<b>游戏</b>：蔚蓝档案、明日方舟、碧蓝航线的图集经 jsDelivr 直链，实测 206/200 且 content-type 正确。
+							文件名由 <code>scripts/gen-wallpaper-manifest.mjs</code> 从仓库枚举并固化，
+							因为 jsDelivr 的目录列表 API 对这些大仓库返回 403。
+						</li>
+					</ul>
+					<p><b>未能接入</b></p>
+					<ul>
+						<li><code>bing.com/HPImageArchive</code>：无 CORS，浏览器 fetch 被拦。</li>
+						<li><code>api.lolicon.app</code>：带 Origin 请求返回 403。</li>
+						<li><code>api.dujin.org</code>、<code>api.btstu.cn</code>：521 / 连接失败，返回反爬脚本。</li>
+						<li>战双、终末地、星塔旅人、异环：给出的链接是签到机器人、Live2D 查看器或数据仓库，没有壁纸直链。</li>
+					</ul>
+					<p class="set-details__warn">
+						注意：碧蓝航线皮肤立绘目录（<code>images/skins</code>）擦边内容风险较高，已刻意排除；
+						其余图集为游戏场景与剧情素材。这些图源均为第三方，可用性不由本站保证。
+					</p>
+				</div>
+			</details>
+		</div>
+
+		<footer class="settings__foot">
+			<div class="settings__actions">
+				<button type="button" class="btn btn--accent" id="wallpaperShuffle">换一张壁纸</button>
+				<button type="button" class="btn" id="wallpaperReset">恢复默认</button>
+			</div>
+			<p class="settings__status" id="wallpaperStatus">就绪</p>
+		</footer>
+	</aside>
+</div>
+
+<script type="application/json" id="wallpaper-config" set:html={configJson} />
+
+<script>
+	const configEl = document.getElementById('wallpaper-config');
+	if (configEl) {
+		const cfg = JSON.parse(configEl.textContent || '{}');
+		const root = document.documentElement;
+		const fade = document.getElementById('wallpaperFade');
+		const panel = document.getElementById('settings');
+		const statusEl = document.getElementById('wallpaperStatus');
+
+		const DEFAULTS = cfg.defaults || {};
+		const KEY = cfg.key || 'moying-wallpaper';
+		const MANIFEST_URL = cfg.manifestUrl || '/wallpaper-manifest.json';
+
+		let settings = load();
+		let timer: number | null = null;
+		let applyToken = 0;
+
+		/* -------------------------------------------------- 设置读写 */
+		function load() {
+			const base = { ...DEFAULTS };
+			try {
+				const raw = localStorage.getItem(KEY);
+				if (!raw) return base;
+				const saved = JSON.parse(raw);
+				// 只接受已知键，避免旧版本残留字段污染
+				for (const key of Object.keys(base)) {
+					if (key in saved) base[key] = saved[key];
+				}
+			} catch (e) {
+				/* 隐私模式或数据损坏：退回默认值 */
+			}
+			return base;
+		}
+
+		function save() {
+			try {
+				localStorage.setItem(KEY, JSON.stringify(settings));
+			} catch (e) {
+				/* 忽略持久化失败 */
+			}
+		}
+
+		/* -------------------------------------------------- 图集清单 */
+		// 游戏图集的图片直链体积较大，只有真正用到时才拉取，且整个会话只拉一次
+		let manifestPromise: Promise<any> | null = null;
+
+		function loadManifest() {
+			if (!manifestPromise) {
+				manifestPromise = fetch(MANIFEST_URL, { cache: 'force-cache' })
+					.then((response) => (response.ok ? response.json() : { galleries: {} }))
+					.catch(() => ({ galleries: {} }));
+			}
+			return manifestPromise;
+		}
+
+		/* -------------------------------------------------- 图源解析 */
+		// 只允许 https 图片地址，并剔除可能破坏 CSS url() 的字符
+		function safeUrl(value: unknown) {
+			if (typeof value !== 'string') return '';
+			if (!/^https:\/\//i.test(value)) return '';
+			return value.replace(/["'()\\\s<>]/g, '');
+		}
+
+		// 追加随机参数击穿缓存，保证「换一张」真的换（图集类靠换文件，不需要）
+		function bust(url: string) {
+			const sep = url.includes('?') ? '&' : '?';
+			return `${url}${sep}r=${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+		}
+
+		function pickByPath(obj: any, path: string) {
+			return String(path || '')
+				.split('.')
+				.reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
+		}
+
+		async function resolveUrl(source: any) {
+			if (source.kind === 'pool') {
+				const manifest = await loadManifest();
+				const list: string[] = (manifest.galleries?.[source.galleryId]?.urls || [])
+					.map(safeUrl)
+					.filter(Boolean);
+				if (!list.length) throw new Error('图集为空');
+				// 每次都换文件即可保证不同，因此不加随机参数，保留 CDN 缓存收益
+				return list[Math.floor(Math.random() * list.length)];
+			}
+
+			if (source.kind === 'image') return bust(source.url);
+
+			const response = await fetch(bust(source.url), { cache: 'no-store' });
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const data = await response.json();
+			const url = safeUrl(pickByPath(data, source.pick));
+			if (!url) throw new Error('响应中没有图片地址');
+			return url;
+		}
+
+		function preload(url: string, timeout = 15000) {
+			return new Promise<boolean>((resolve) => {
+				const img = new Image();
+				let settled = false;
+				const finish = (ok: boolean) => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(timer);
+					resolve(ok);
+				};
+				const timer = window.setTimeout(() => finish(false), timeout);
+				img.onload = () => finish(true);
+				img.onerror = () => finish(false);
+				img.decoding = 'async';
+				img.src = url;
+			});
+		}
+
+		function buildPool() {
+			const games = cfg.games || [];
+			const gameCandidates = games
+				.filter((game: any) => settings.games.includes(game.id))
+				.flatMap((game: any) => game.candidates || []);
+
+			switch (settings.mode) {
+				case 'bing':
+					return [...(cfg.sources?.bing || [])];
+				case 'anime':
+					return [...(cfg.sources?.anime || [])];
+				case 'games':
+					return gameCandidates;
+				case 'off':
+					return [];
+				default:
+					return [...(cfg.sources?.bing || []), ...(cfg.sources?.anime || []), ...gameCandidates];
+			}
+		}
+
+		/* ------------------------------------------- 交叉淡入与应用 */
+		function applyWallpaper(url: string, credit?: string) {
+			const clean = safeUrl(url);
+			if (!clean) return;
+
+			const token = ++applyToken;
+			fade?.style.setProperty('--wallpaper-fade-image', `url("${clean}")`);
+			requestAnimationFrame(() => fade?.classList.add('is-visible'));
+
+			// 淡入完成后再写入基础层，两层内容一致所以看不出切换
+			window.setTimeout(() => {
+				if (token !== applyToken) return;
+				root.style.setProperty('--wallpaper-image', `url("${clean}")`);
+				fade?.classList.remove('is-visible');
+				settings.lastUrl = clean;
+				settings.lastCredit = credit || '';
+				save();
+				setStatus(credit ? `当前：${credit}` : '已更新壁纸');
+			}, 980);
+		}
+
+		function clearWallpaper() {
+			applyToken++;
+			fade?.classList.remove('is-visible');
+			root.style.removeProperty('--wallpaper-image');
+		}
+
+		/*
+		 * 兜底：连续换图时，后一次若所有候选都失败，淡入层可能停在一张
+		 * 尚未提交到基础层的图上。这里把它提交并收起，避免状态悬空。
+		 */
+		function settlePendingFade() {
+			const pending = fade?.style.getPropertyValue('--wallpaper-fade-image') || '';
+			if (!pending) return;
+			applyToken++;
+			root.style.setProperty('--wallpaper-image', pending);
+			fade?.classList.remove('is-visible');
+		}
+
+		function setStatus(text: string) {
+			if (statusEl) statusEl.textContent = text;
+		}
+
+		/* -------------------------------------------------- 换一张 */
+		let shuffling = false;
+
+		async function shuffle(reason?: string) {
+			if (shuffling) return;
+			const pool = buildPool();
+
+			if (!pool.length) {
+				if (settings.mode === 'off') {
+					clearWallpaper();
+					setStatus('已关闭图片壁纸，使用内置渐变');
+				} else if (settings.mode === 'games') {
+					setStatus('请先勾选至少一个游戏图源');
+				} else {
+					setStatus('当前模式下没有可用图源');
+				}
+				return;
+			}
+
+			shuffling = true;
+			setStatus(reason === 'auto' ? '正在自动更换…' : '正在获取…');
+
+			// 逐个尝试，任一图源失败就换下一个，避免个别源抽风导致空白
+			const candidates = [...pool].sort(() => Math.random() - 0.5);
+			for (const source of candidates) {
+				try {
+					const url = await resolveUrl(source);
+					if (await preload(url)) {
+						applyWallpaper(url, source.label);
+						shuffling = false;
+						return;
+					}
+				} catch (e) {
+					/* 换下一个图源 */
+				}
+			}
+
+			shuffling = false;
+			settlePendingFade();
+			setStatus('所有图源都取不到图，已保留当前壁纸');
+		}
+
+		/* -------------------------------------------------- 外观应用 */
+		function phaseSync() {
+			// 两层共用同一动画相位，避免交叉淡入时出现重影
+			root.style.setProperty('--wallpaper-drift-delay', `${-(performance.now() / 1000) % 64}s`);
+		}
+
+		function applyAppearance() {
+			root.style.setProperty('--wallpaper-blur', `${Number(settings.blur) || 0}px`);
+			root.style.setProperty(
+				'--wallpaper-dim',
+				settings.mode === 'off' ? '0' : String(Number(settings.dim) || 0),
+			);
+			root.classList.toggle('wallpaper-kenburns', Boolean(settings.kenBurns));
+			phaseSync();
+		}
+
+		function scheduleAuto() {
+			if (timer) window.clearInterval(timer);
+			timer = null;
+			const minutes = Number(settings.interval) || 0;
+			if (minutes > 0 && settings.mode !== 'off') {
+				timer = window.setInterval(() => shuffle('auto'), minutes * 60_000);
+			}
+		}
+
+		/* -------------------------------------------------- 面板同步 */
+		function syncPanel() {
+			panel?.querySelectorAll<HTMLInputElement>('input[name="wallpaper-mode"]').forEach((input) => {
+				input.checked = input.value === settings.mode;
+			});
+			panel?.querySelectorAll<HTMLInputElement>('#gameList input[type="checkbox"]').forEach((input) => {
+				input.checked = settings.games.includes(input.value);
+			});
+
+			const blur = panel?.querySelector<HTMLInputElement>('#setBlur');
+			const dim = panel?.querySelector<HTMLInputElement>('#setDim');
+			const ken = panel?.querySelector<HTMLInputElement>('#setKenBurns');
+			const interval = panel?.querySelector<HTMLSelectElement>('#setInterval');
+
+			if (blur) blur.value = String(settings.blur);
+			if (dim) dim.value = String(settings.dim);
+			if (ken) ken.checked = Boolean(settings.kenBurns);
+			if (interval) interval.value = String(settings.interval);
+
+			const blurValue = document.getElementById('setBlurValue');
+			const dimValue = document.getElementById('setDimValue');
+			if (blurValue) blurValue.textContent = `${settings.blur} px`;
+			if (dimValue) dimValue.textContent = `${Math.round(settings.dim * 100)}%`;
+
+			// Bing / 纯渐变模式下淡化游戏区（全随机也会用所选游戏，故仍可操作）
+			document
+				.getElementById('gameList')
+				?.classList.toggle('is-muted', settings.mode === 'off' || settings.mode === 'bing');
+		}
+
+		/* -------------------------------------------------- 事件 */
+		panel?.addEventListener('change', (event) => {
+			const target = event.target as HTMLInputElement;
+			if (!target) return;
+
+			if (target.name === 'wallpaper-mode') {
+				settings.mode = target.value as typeof settings.mode;
+				save();
+				applyAppearance();
+				syncPanel();
+				scheduleAuto();
+				shuffle();
+				return;
+			}
+
+			if (target.closest('#gameList') && target.type === 'checkbox') {
+				const id = target.value;
+				settings.games = target.checked
+					? [...new Set([...settings.games, id])]
+					: settings.games.filter((game: string) => game !== id);
+				save();
+				syncPanel();
+				if (settings.mode === 'games' || settings.mode === 'all') shuffle();
+			}
+		});
+
+		panel?.addEventListener('input', (event) => {
+			const target = event.target as HTMLInputElement;
+			if (!target) return;
+
+			if (target.id === 'setBlur') {
+				settings.blur = Number(target.value);
+				applyAppearance();
+				const label = document.getElementById('setBlurValue');
+				if (label) label.textContent = `${settings.blur} px`;
+				save();
+			} else if (target.id === 'setDim') {
+				settings.dim = Number(target.value);
+				applyAppearance();
+				const label = document.getElementById('setDimValue');
+				if (label) label.textContent = `${Math.round(settings.dim * 100)}%`;
+				save();
+			} else if (target.id === 'setKenBurns') {
+				settings.kenBurns = target.checked;
+				applyAppearance();
+				save();
+			}
+		});
+
+		panel?.addEventListener('change', (event) => {
+			const target = event.target as HTMLSelectElement;
+			if (target?.id === 'setInterval') {
+				settings.interval = Number(target.value);
+				save();
+				scheduleAuto();
+				setStatus(settings.interval ? `已开启自动更换（${settings.interval} 分钟）` : '已关闭自动更换');
+			}
+		});
+
+		document.getElementById('wallpaperShuffle')?.addEventListener('click', () => shuffle());
+
+		document.getElementById('wallpaperReset')?.addEventListener('click', () => {
+			settings = { ...DEFAULTS };
+			save();
+			applyAppearance();
+			syncPanel();
+			scheduleAuto();
+			clearWallpaper();
+			shuffle();
+			setStatus('已恢复默认设置');
+		});
+
+		function openPanel() {
+			panel?.classList.add('is-open');
+			document.body.style.overflow = 'hidden';
+			syncPanel();
+		}
+
+		function closePanel() {
+			panel?.classList.remove('is-open');
+			document.body.style.overflow = '';
+		}
+
+		document.getElementById('settingsOpen')?.addEventListener('click', openPanel);
+		panel?.querySelectorAll('[data-settings-close]').forEach((el) => {
+			el.addEventListener('click', closePanel);
+		});
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape' && panel?.classList.contains('is-open')) closePanel();
+		});
+
+		/* -------------------------------------------------- 初始化 */
+		applyAppearance();
+		syncPanel();
+		scheduleAuto();
+
+		if (settings.mode === 'off') {
+			clearWallpaper();
+			setStatus('已关闭图片壁纸，使用内置渐变');
+		} else if (safeUrl(settings.lastUrl)) {
+			// BaseHead 已用上次的图片直接绘制过，这里不再重复下载
+			setStatus(settings.lastCredit ? `当前：${settings.lastCredit}` : '已沿用上次壁纸');
+		} else {
+			shuffle();
+		}
+	}
+</script>
+
+<style>
+	/* ---------------------------------------------------------- 设置面板 */
+	.settings {
+		position: fixed;
+		inset: 0;
+		z-index: 92;
+		visibility: hidden;
+		opacity: 0;
+		transition:
+			opacity var(--dur) var(--ease-standard),
+			visibility var(--dur);
+	}
+
+	.settings.is-open {
+		visibility: visible;
+		opacity: 1;
+	}
+
+	.settings__scrim {
+		position: absolute;
+		inset: 0;
+		background: rgba(8, 10, 16, 0.38);
+		-webkit-backdrop-filter: blur(4px);
+		backdrop-filter: blur(4px);
+	}
+
+	/* Windows 11 设置页那样的右侧 Acrylic 面板 */
+	.settings__panel {
+		position: absolute;
+		top: 0;
+		right: 0;
+		display: flex;
+		flex-direction: column;
+		width: min(410px, 94vw);
+		height: 100%;
+		background: var(--surface-2);
+		border-left: 1px solid var(--stroke-strong);
+		box-shadow: var(--shadow-flyout), inset 1px 0 0 var(--stroke-inner);
+		-webkit-backdrop-filter: blur(50px) saturate(var(--sat));
+		backdrop-filter: blur(50px) saturate(var(--sat));
+		transform: translateX(102%);
+		transition: transform 420ms var(--ease-fluent);
+	}
+
+	.settings.is-open .settings__panel {
+		transform: none;
+	}
+
+	.settings__head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1.1rem 1.1rem 0.9rem;
+		border-bottom: 1px solid var(--stroke);
+	}
+
+	.settings__eyebrow {
+		margin: 0 0 0.15rem;
+		font-size: 0.7rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--text-tertiary);
+	}
+
+	.settings__title {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 1.15rem;
+		font-weight: 620;
+		color: var(--text);
+	}
+
+	.settings__body {
+		flex: 1;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 1.1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.set-group__title {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.45rem;
+		margin: 0 0 0.7rem;
+		font-size: 0.82rem;
+		font-weight: 620;
+		letter-spacing: 0.02em;
+		color: var(--text);
+	}
+
+	.set-group__hint {
+		font-size: 0.7rem;
+		font-weight: 400;
+		line-height: 1.5;
+		color: var(--text-tertiary);
+	}
+
+	/* -------------------------------------------------- 来源单选 */
+	.set-options {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.set-option {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		padding: 0.6rem 0.75rem;
+		border-radius: var(--r-sm);
+		border: 1px solid transparent;
+		cursor: pointer;
+		transition: all var(--dur-fast) var(--ease-standard);
+	}
+
+	.set-option:hover {
+		background: var(--surface-hover);
+	}
+
+	.set-option input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.set-option__body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.set-option__label {
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	.set-option__desc {
+		font-size: 0.74rem;
+		color: var(--text-tertiary);
+	}
+
+	.set-option__mark {
+		width: 18px;
+		height: 18px;
+		flex: none;
+		border-radius: 50%;
+		border: 1.5px solid var(--stroke-strong);
+		transition: all var(--dur-fast) var(--ease-standard);
+	}
+
+	.set-option:has(input:checked) {
+		background: var(--accent-soft);
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+	}
+
+	.set-option:has(input:checked) .set-option__label {
+		color: var(--accent);
+		font-weight: 600;
+	}
+
+	.set-option:has(input:checked) .set-option__mark {
+		border-color: var(--accent);
+		border-width: 5px;
+	}
+
+	.set-option:has(input:focus-visible) {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	/* -------------------------------------------------- 游戏多选 */
+	.set-games {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		transition: opacity var(--dur) var(--ease-standard);
+	}
+
+	.set-games.is-muted {
+		opacity: 0.5;
+	}
+
+	.set-game {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		align-items: center;
+		gap: 0.1rem 0.6rem;
+		padding: 0.5rem 0.7rem;
+		border-radius: var(--r-sm);
+		cursor: pointer;
+		transition: background var(--dur-fast) var(--ease-standard);
+	}
+
+	.set-game:hover:not(.is-disabled) {
+		background: var(--surface-hover);
+	}
+
+	.set-game.is-disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.set-game input {
+		width: 15px;
+		height: 15px;
+		accent-color: var(--accent);
+	}
+
+	.set-game__label {
+		font-size: 0.87rem;
+		color: var(--text);
+		min-width: 0;
+	}
+
+	.set-game__meta {
+		font-size: 0.72rem;
+		line-height: 1.45;
+		color: var(--text-tertiary);
+	}
+
+	.set-game__meta.is-ok {
+		color: var(--accent);
+	}
+
+	.set-game__note {
+		font-size: 0.7rem;
+		line-height: 1.55;
+		color: var(--text-tertiary);
+	}
+
+	/* -------------------------------------------------- 滑杆与开关 */
+	.set-row {
+		margin-bottom: 0.9rem;
+	}
+
+	.set-row__label {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 0.35rem;
+		font-size: 0.83rem;
+		color: var(--text-secondary);
+	}
+
+	.set-row__value {
+		font-family: var(--font-mono);
+		font-size: 0.76rem;
+		color: var(--accent);
+	}
+
+	input[type='range'] {
+		width: 100%;
+		height: 20px;
+		appearance: none;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	input[type='range']::-webkit-slider-runnable-track {
+		height: 4px;
+		border-radius: var(--r-pill);
+		background: var(--stroke-strong);
+	}
+
+	input[type='range']::-webkit-slider-thumb {
+		appearance: none;
+		width: 16px;
+		height: 16px;
+		margin-top: -6px;
+		border-radius: 50%;
+		background: var(--accent);
+		border: 3px solid var(--surface-3);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+	}
+
+	input[type='range']::-moz-range-track {
+		height: 4px;
+		border-radius: var(--r-pill);
+		background: var(--stroke-strong);
+	}
+
+	input[type='range']::-moz-range-thumb {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--accent);
+		border: 3px solid var(--surface-3);
+	}
+
+	.set-switch {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.7rem;
+		cursor: pointer;
+	}
+
+	.set-switch input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.set-switch__track {
+		position: relative;
+		flex: none;
+		width: 38px;
+		height: 21px;
+		margin-top: 0.1rem;
+		border-radius: var(--r-pill);
+		border: 1px solid var(--stroke-strong);
+		background: var(--surface-sunken);
+		transition: all var(--dur) var(--ease-standard);
+	}
+
+	.set-switch__thumb {
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		width: 13px;
+		height: 13px;
+		border-radius: 50%;
+		background: var(--text-tertiary);
+		transition: all var(--dur) var(--ease-fluent);
+	}
+
+	.set-switch input:checked + .set-switch__track {
+		background: var(--accent);
+		border-color: var(--accent);
+	}
+
+	.set-switch input:checked + .set-switch__track .set-switch__thumb {
+		left: 20px;
+		background: var(--accent-fg);
+	}
+
+	.set-switch input:focus-visible + .set-switch__track {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.set-switch__text {
+		font-size: 0.85rem;
+		color: var(--text);
+	}
+
+	.set-switch__desc {
+		display: block;
+		font-size: 0.71rem;
+		color: var(--text-tertiary);
+	}
+
+	.set-select {
+		width: 100%;
+		padding: 0.45rem 0.6rem;
+		border-radius: var(--r-sm);
+		border: 1px solid var(--stroke);
+		background: var(--surface-1);
+		color: var(--text);
+		font-size: 0.85rem;
+	}
+
+	.set-note {
+		margin: 0.6rem 0 0;
+		font-size: 0.72rem;
+		line-height: 1.6;
+		color: var(--text-tertiary);
+	}
+
+	/* -------------------------------------------------- 图源说明 */
+	.set-details {
+		border-radius: var(--r-sm);
+		border: 1px solid var(--stroke);
+		background: var(--surface-1);
+		overflow: hidden;
+	}
+
+	.set-details > summary {
+		padding: 0.6rem 0.8rem;
+		cursor: pointer;
+		font-size: 0.78rem;
+		color: var(--text-secondary);
+		list-style: none;
+	}
+
+	.set-details > summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.set-details__body {
+		padding: 0 0.85rem 0.8rem;
+		font-size: 0.73rem;
+		line-height: 1.7;
+		color: var(--text-tertiary);
+	}
+
+	.set-details__body p {
+		margin: 0 0 0.5rem;
+	}
+
+	.set-details__body ul {
+		margin: 0 0 0.6rem;
+		padding-left: 1.1rem;
+	}
+
+	.set-details__body code {
+		font-size: 0.95em;
+	}
+
+	.set-details__warn {
+		padding: 0.5rem 0.6rem;
+		border-radius: var(--r-xs);
+		background: var(--accent-soft);
+		color: var(--text-secondary);
+	}
+
+	/* -------------------------------------------------- 底部操作 */
+	.settings__foot {
+		padding: 0.9rem 1.1rem 1.1rem;
+		border-top: 1px solid var(--stroke);
+		background: var(--surface-1);
+	}
+
+	.settings__actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.settings__actions .btn {
+		flex: 1;
+	}
+
+	.settings__status {
+		margin: 0.6rem 0 0;
+		font-size: 0.73rem;
+		color: var(--text-tertiary);
+		min-height: 1.1em;
+	}
+
+	@media (max-width: 520px) {
+		.settings__panel {
+			width: 100%;
+		}
+	}
+</style>

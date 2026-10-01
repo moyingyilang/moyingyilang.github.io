@@ -1,0 +1,57 @@
+---
+/** 深浅色切换：图标由 <html data-theme> 决定，逻辑在 SiteScripts.astro */
+---
+
+<button
+	type="button"
+	class="btn btn--icon theme-toggle"
+	id="themeToggle"
+	aria-label="切换深色 / 浅色外观"
+	title="切换深色 / 浅色外观"
+>
+	<svg
+		class="theme-toggle__sun"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.7"
+		stroke-linecap="round"
+		aria-hidden="true"
+	>
+		<circle cx="12" cy="12" r="4.2"></circle>
+		<path d="M12 2.6v2.2"></path><path d="M12 19.2v2.2"></path>
+		<path d="M2.6 12h2.2"></path><path d="M19.2 12h2.2"></path>
+		<path d="M5.4 5.4 7 7"></path><path d="M17 17l1.6 1.6"></path>
+		<path d="M18.6 5.4 17 7"></path><path d="M7 17l-1.6 1.6"></path>
+	</svg>
+	<svg
+		class="theme-toggle__moon"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.7"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		<path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"></path>
+	</svg>
+</button>
+
+<style>
+	.theme-toggle {
+		flex: none;
+	}
+
+	.theme-toggle__moon {
+		display: none;
+	}
+
+	:global(html[data-theme='dark']) .theme-toggle__sun {
+		display: none;
+	}
+
+	:global(html[data-theme='dark']) .theme-toggle__moon {
+		display: block;
+	}
+</style>

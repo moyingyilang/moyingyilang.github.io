@@ -1,25 +1,203 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Footer from '../components/Footer.astro';
-import Header from '../components/Header.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+import { MENU_DATA, flattenMenu } from '../config/menu.js';
+import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../utils/posts';
+
+const posts = await getSortedPosts();
+const latest = posts.slice(0, 4);
+const menuNodes = flattenMenu();
+const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
+
+const SECTION_DESC = {
+	tech: '物理、化学与实验类笔记',
+	code: '容器、开发语言与开发环境',
+	notes: '项目进度、攻略、PCB 与刷机',
+	tools: '自用的小工具集合',
+	faq: '常见问题与排查记录',
+	about: '关于本站与联系方式',
+};
 ---
 
-<!doctype html>
-<html lang="zh-CN">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>欢迎来到我的个人博客</h1>
-			<p>
-				这是一个基于 Astro 构建的轻量博客与主页，专注分享技术笔记、开发经验与项目实践
-			</p>
-			<p>
-				内容以编程、网页开发、系统优化为主，所有文章与代码均保持简洁实用，方便快速查阅与使用
-		</main>
-		<Footer />
-	</body>
-</html>
+<BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION} bare>
+	<section class="card card--pad hero reveal">
+		<span class="badge">Astro · 静态站点</span>
+		<h1 class="page-title text-gradient">{SITE_TITLE}</h1>
+		<p class="page-desc">{SITE_DESCRIPTION}</p>
+
+		<div class="row hero__actions">
+			<a class="btn btn--accent" href="/tech">
+				开始阅读
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="hero__cta-icon">
+					<path d="M5 12h13" /><path d="m12 6 6 6-6 6" />
+				</svg>
+			</a>
+			<a class="btn" href="/blog">全部文章</a>
+			<a class="btn btn--ghost" href="/about">关于本站</a>
+		</div>
+
+		<dl class="hero__stats">
+			<div class="hero__stat">
+				<dt>文章</dt>
+				<dd>{posts.length}</dd>
+			</div>
+			<div class="hero__stat">
+				<dt>导航节点</dt>
+				<dd>{menuNodes.length}</dd>
+			</div>
+			<div class="hero__stat">
+				<dt>标签</dt>
+				<dd>{tagCount}</dd>
+			</div>
+		</dl>
+	</section>
+
+	<section class="stack">
+		<h2 class="section-heading">浏览方向</h2>
+		<div class="grid grid--auto">
+			{
+				MENU_DATA.map((item, index) => (
+					<a
+						class="card reveal"
+						href={`/${item.path}`}
+						style={`transition-delay:${Math.min(index * 45, 240)}ms`}
+					>
+						<span class="card__arrow">→</span>
+						<div class="section-card__head">
+							{item.icon && (
+								<svg
+									class="section-card__icon"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.7"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+									set:html={item.icon}
+								/>
+							)}
+							<h3 class="card__title">{item.label}</h3>
+						</div>
+						<p class="card__desc">{SECTION_DESC[item.path] ?? ''}</p>
+						{item.children?.length ? (
+							<p class="card__meta">
+								<span>{item.children.length} 个子分类</span>
+							</p>
+						) : (
+							<p class="card__meta">
+								<span>独立页面</span>
+							</p>
+						)}
+					</a>
+				))
+			}
+		</div>
+	</section>
+
+	{
+		latest.length > 0 && (
+			<section class="stack">
+				<h2 class="section-heading">最新文章</h2>
+				<div class="grid grid--2">
+					{latest.map((post, index) => {
+						const cat = categoryOf(post);
+						return (
+							<a
+								class="card reveal"
+								href={postHref(post)}
+								style={`transition-delay:${Math.min(index * 45, 180)}ms`}
+							>
+								<span class="card__arrow">→</span>
+								<h3 class="card__title">{post.data.title}</h3>
+								{post.data.description && <p class="card__desc">{post.data.description}</p>}
+								<p class="card__meta">
+									{cat && <span class="badge">{cat.label}</span>}
+									<span>{formatDate(post.data.date ?? post.data.pubDate)}</span>
+									<span>· {readingTime(post.body)}</span>
+								</p>
+							</a>
+						);
+					})}
+				</div>
+			</section>
+		)
+	}
+</BaseLayout>
+
+<style>
+	.hero {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.35rem;
+		overflow: hidden;
+	}
+
+	/* MIUI 式大圆角光斑，增加玻璃层次 */
+	.hero::after {
+		content: '';
+		position: absolute;
+		right: -80px;
+		top: -80px;
+		width: 280px;
+		height: 280px;
+		border-radius: 50%;
+		background: radial-gradient(circle, var(--accent-glow), transparent 68%);
+		pointer-events: none;
+	}
+
+	.hero__actions {
+		margin-top: 1.1rem;
+	}
+
+	.hero__cta-icon {
+		width: 15px;
+		height: 15px;
+	}
+
+	.hero__stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2rem;
+		margin: 1.6rem 0 0;
+		padding-top: 1.2rem;
+		border-top: 1px solid var(--stroke);
+		width: 100%;
+	}
+
+	.hero__stat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+
+	.hero__stat dt {
+		font-size: 0.75rem;
+		letter-spacing: 0.06em;
+		color: var(--text-tertiary);
+	}
+
+	.hero__stat dd {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 1.5rem;
+		font-weight: 650;
+		line-height: 1.1;
+		color: var(--text);
+	}
+
+	.section-card__head {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		margin-bottom: 0.35rem;
+	}
+
+	.section-card__icon {
+		width: 19px;
+		height: 19px;
+		color: var(--accent);
+		flex: none;
+	}
+</style>

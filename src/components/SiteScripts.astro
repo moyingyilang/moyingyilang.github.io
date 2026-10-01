@@ -1,0 +1,394 @@
+---
+/**
+ * 站点交互脚本
+ *
+ * 集中在一个组件里挂载，避免各组件重复绑定监听。
+ * 全部使用事件委托 + 空值保护，页面上没有对应元素时静默跳过。
+ */
+---
+
+<script>
+	const $ = (selector, root = document) => root.querySelector(selector);
+	const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+	// 告知 BaseHead 里的兜底定时器：交互脚本已就绪，无需强制显示
+	window.__revealReady = true;
+
+	/* ---------------------------------------------------------------- 主题 */
+	const themeKey = 'moying-theme';
+	const rootEl = document.documentElement;
+	const themeBtn = $('#themeToggle');
+
+	if (themeBtn) {
+		const sync = () => {
+			const dark = rootEl.dataset.theme === 'dark';
+			themeBtn.setAttribute('aria-label', dark ? '切换到浅色外观' : '切换到深色外观');
+			themeBtn.setAttribute('title', dark ? '切换到浅色外观' : '切换到深色外观');
+		};
+		sync();
+		themeBtn.addEventListener('click', () => {
+			const next = rootEl.dataset.theme === 'dark' ? 'light' : 'dark';
+			rootEl.dataset.theme = next;
+			try {
+				localStorage.setItem(themeKey, next);
+			} catch (e) {
+				/* 隐私模式：忽略持久化失败 */
+			}
+			sync();
+		});
+	}
+
+	/* ------------------------------------------------------- 侧边栏抽屉 */
+	const drawerBtn = $('#drawerToggle');
+	const scrim = $('#scrim');
+	const sidenav = $('#sidenav');
+
+	const setDrawer = (open) => {
+		document.body.classList.toggle('is-drawer-open', open);
+		drawerBtn?.setAttribute('aria-expanded', String(open));
+		drawerBtn?.setAttribute('aria-label', open ? '关闭导航' : '打开导航');
+	};
+
+	drawerBtn?.addEventListener('click', () => {
+		setDrawer(!document.body.classList.contains('is-drawer-open'));
+	});
+	scrim?.addEventListener('click', () => setDrawer(false));
+
+	// 移动端点击导航链接后自动收起
+	sidenav?.addEventListener('click', (event) => {
+		if (event.target.closest('a') && window.matchMedia('(max-width: 991px)').matches) {
+			setDrawer(false);
+		}
+	});
+
+	/* --------------------------------------------------- 导航分组展开 */
+	document.addEventListener('click', (event) => {
+		const toggle = event.target.closest('[data-nav-toggle]');
+		if (!toggle) return;
+		const item = toggle.closest('.sidenav__item');
+		if (!item) return;
+		const open = item.classList.toggle('is-open');
+		toggle.setAttribute('aria-expanded', String(open));
+	});
+
+	/* ------------------------------------------------------- 搜索面板 */
+	const palette = $('#palette');
+	const paletteInput = $('#paletteInput');
+	const paletteResults = $('#paletteResults');
+
+	let searchIndex = null;
+	let matches = [];
+	let cursor = 0;
+
+	const isTyping = (el) =>
+		el instanceof HTMLElement &&
+		(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+
+	const escapeHtml = (value) =>
+		String(value).replace(
+			/[&<>"']/g,
+			(char) =>
+				({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+		);
+
+	async function loadIndex() {
+		if (searchIndex) return searchIndex;
+		try {
+			const response = await fetch('/search-index.json');
+			searchIndex = response.ok ? await response.json() : [];
+		} catch (e) {
+			searchIndex = [];
+		}
+		return searchIndex;
+	}
+
+	function renderResults() {
+		if (!paletteResults) return;
+
+		if (!matches.length) {
+			paletteResults.innerHTML = `<li class="palette__empty">没有匹配的结果</li>`;
+			return;
+		}
+
+		paletteResults.innerHTML = matches
+			.map(
+				(item, i) => `
+				<li class="palette__item${i === cursor ? ' is-cursor' : ''}" role="option"
+					aria-selected="${i === cursor}" data-index="${i}">
+					<span class="palette__item-title">${escapeHtml(item.title)}</span>
+					<span class="palette__item-path">${escapeHtml(item.kind || '')}</span>
+				</li>`,
+			)
+			.join('');
+	}
+
+	function search(query) {
+		const q = query.trim().toLowerCase();
+		const all = searchIndex || [];
+		if (!q) {
+			matches = all.slice(0, 8);
+		} else {
+			matches = all
+				.map((item) => {
+					const title = item.title.toLowerCase();
+					const extra = `${item.description || ''} ${item.kind || ''}`.toLowerCase();
+					let score = 0;
+					if (title === q) score = 100;
+					else if (title.startsWith(q)) score = 80;
+					else if (title.includes(q)) score = 60;
+					else if (extra.includes(q)) score = 30;
+					return { item, score };
+				})
+				.filter((entry) => entry.score > 0)
+				.sort((a, b) => b.score - a.score)
+				.slice(0, 12)
+				.map((entry) => entry.item);
+		}
+		cursor = 0;
+		renderResults();
+	}
+
+	function openPalette() {
+		if (!palette) return;
+		palette.classList.add('is-open');
+		document.body.style.overflow = 'hidden';
+		paletteInput?.focus();
+		paletteInput?.select();
+		loadIndex().then(() => search(paletteInput?.value || ''));
+	}
+
+	function closePalette() {
+		if (!palette) return;
+		palette.classList.remove('is-open');
+		document.body.style.overflow = '';
+		matches = [];
+	}
+
+	function openMatch(index) {
+		const item = matches[index];
+		if (!item) return;
+		closePalette();
+		window.location.href = item.url;
+	}
+
+	$('#searchOpen')?.addEventListener('click', openPalette);
+	palette?.addEventListener('click', (event) => {
+		if (event.target === palette) closePalette();
+	});
+
+	paletteInput?.addEventListener('input', (event) => search(event.target.value));
+	paletteInput?.addEventListener('keydown', (event) => {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			cursor = matches.length ? (cursor + 1) % matches.length : 0;
+			renderResults();
+			paletteResults?.querySelector('.is-cursor')?.scrollIntoView({ block: 'nearest' });
+		} else if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			cursor = matches.length ? (cursor - 1 + matches.length) % matches.length : 0;
+			renderResults();
+			paletteResults?.querySelector('.is-cursor')?.scrollIntoView({ block: 'nearest' });
+		} else if (event.key === 'Enter') {
+			event.preventDefault();
+			openMatch(cursor);
+		}
+	});
+
+	paletteResults?.addEventListener('click', (event) => {
+		const row = event.target.closest('.palette__item');
+		if (row) openMatch(Number(row.dataset.index));
+	});
+
+	// 快捷键：Ctrl/⌘+K 与 / 唤起，Esc 逐层关闭
+	document.addEventListener('keydown', (event) => {
+		const paletteOpen = palette?.classList.contains('is-open');
+
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+			event.preventDefault();
+			paletteOpen ? closePalette() : openPalette();
+			return;
+		}
+
+		if (event.key === '/' && !isTyping(event.target) && !paletteOpen) {
+			event.preventDefault();
+			openPalette();
+			return;
+		}
+
+		if (event.key === 'Escape') {
+			if (paletteOpen) closePalette();
+			else if (lightbox?.classList.contains('is-open')) closeLightbox();
+			else setDrawer(false);
+		}
+	});
+
+	// 苹果平台显示 ⌘ K
+	const kbdHint = $('[data-search-kbd]');
+	if (kbdHint && /Mac|iPhone|iPad/.test(navigator.userAgent)) {
+		kbdHint.textContent = '⌘ K';
+	}
+
+	/* --------------------------------------------- 正文增强：代码块 / 表格 */
+	$$('.prose pre').forEach((pre) => {
+		if (pre.closest('.code-block')) return;
+
+		const wrapper = document.createElement('div');
+		wrapper.className = 'code-block';
+
+		const bar = document.createElement('div');
+		bar.className = 'code-block__bar';
+
+		const lang = document.createElement('span');
+		lang.className = 'code-block__lang';
+		lang.textContent =
+			pre.dataset.language || (pre.className.match(/language-([\w-]+)/) || [])[1] || 'code';
+
+		const copy = document.createElement('button');
+		copy.type = 'button';
+		copy.className = 'code-block__copy';
+		copy.textContent = '复制';
+		copy.addEventListener('click', async () => {
+			try {
+				await navigator.clipboard.writeText(pre.innerText);
+				copy.textContent = '已复制';
+				copy.classList.add('is-done');
+			} catch (e) {
+				copy.textContent = '复制失败';
+			}
+			setTimeout(() => {
+				copy.textContent = '复制';
+				copy.classList.remove('is-done');
+			}, 1600);
+		});
+
+		bar.append(lang, copy);
+		pre.replaceWith(wrapper);
+		wrapper.append(bar, pre);
+	});
+
+	$$('.prose table').forEach((table) => {
+		if (table.closest('.table-wrap')) return;
+		const wrapper = document.createElement('div');
+		wrapper.className = 'table-wrap';
+		table.replaceWith(wrapper);
+		wrapper.append(table);
+	});
+
+	// 正文中的站外链接新开标签页
+	$$('.prose a[href^="http"]').forEach((link) => {
+		if (link.host !== window.location.host) {
+			link.target = '_blank';
+			link.rel = 'noopener noreferrer';
+		}
+	});
+
+	/* ------------------------------------------- 滚动进度 + 目录滚动高亮 */
+	const progress = $('#readProgress');
+	const backToTop = $('#backToTop');
+	const tocLinks = $$('[data-toc-link]');
+
+	const tocTargets = tocLinks
+		.map((link) => {
+			const id = decodeURIComponent(link.getAttribute('href').slice(1));
+			const el = document.getElementById(id);
+			return el ? { el, link } : null;
+		})
+		.filter(Boolean);
+
+	let ticking = false;
+
+	const onScroll = () => {
+		if (ticking) return;
+		ticking = true;
+		requestAnimationFrame(() => {
+			ticking = false;
+
+			if (progress) {
+				const max = document.documentElement.scrollHeight - window.innerHeight;
+				const ratio = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+				progress.style.transform = `scaleX(${ratio})`;
+			}
+
+			if (backToTop) {
+				backToTop.classList.toggle('is-visible', window.scrollY > 420);
+			}
+
+			if (tocTargets.length) {
+				let current = tocTargets[0];
+				for (const target of tocTargets) {
+					if (target.el.getBoundingClientRect().top <= 130) current = target;
+				}
+				tocLinks.forEach((link) => link.classList.remove('is-active'));
+				current.link.classList.add('is-active');
+			}
+		});
+	};
+
+	window.addEventListener('scroll', onScroll, { passive: true });
+	window.addEventListener('resize', onScroll, { passive: true });
+	onScroll();
+
+	/* --------------------------------------------------------- 回到顶部 */
+	backToTop?.addEventListener('click', () => {
+		window.scrollTo({
+			top: 0,
+			behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+		});
+	});
+
+	/* --------------------------------------------------------- 图片灯箱 */
+	const lightbox = $('#lightbox');
+	const lightboxImage = $('#lightboxImage');
+
+	const closeLightbox = () => {
+		if (!lightbox) return;
+		lightbox.classList.remove('is-open');
+		lightboxImage?.removeAttribute('src');
+		document.body.style.overflow = '';
+	};
+
+	$$('.prose img').forEach((img) => {
+		img.addEventListener('click', () => {
+			if (!lightbox || !lightboxImage) return;
+			lightboxImage.src = img.currentSrc || img.src;
+			lightboxImage.alt = img.alt || '';
+			lightbox.classList.add('is-open');
+			document.body.style.overflow = 'hidden';
+		});
+	});
+
+	lightbox?.addEventListener('click', (event) => {
+		if (event.target === lightbox || event.target.closest('.lightbox__close')) closeLightbox();
+	});
+
+	/* --------------------------------------------------------- 入场动画 */
+	const revealEls = $$('.reveal');
+
+	if (revealEls.length) {
+		const revealAll = () => revealEls.forEach((el) => el.classList.add('is-in'));
+
+		if (
+			window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+			!('IntersectionObserver' in window)
+		) {
+			revealAll();
+		} else {
+			try {
+				const observer = new IntersectionObserver(
+					(entries) => {
+						entries.forEach((entry) => {
+							if (!entry.isIntersecting) return;
+							entry.target.classList.add('is-in');
+							observer.unobserve(entry.target);
+						});
+					},
+					{ rootMargin: '0px 0px -6% 0px', threshold: 0.04 },
+				);
+				revealEls.forEach((el) => observer.observe(el));
+			} catch (e) {
+				// 观察器异常时，内容绝不能停留在隐藏状态
+				revealAll();
+			}
+		}
+	}
+</script>

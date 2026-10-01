@@ -1,0 +1,120 @@
+---
+/**
+ * 递归导航树：支持任意层级，并在构建期直接算出展开与选中状态，
+ * 因此静态托管下高亮依然正确（不依赖 window.location）。
+ */
+interface NavItem {
+	label: string;
+	path: string;
+	icon?: string;
+	children?: NavItem[];
+}
+
+interface Props {
+	items: NavItem[];
+	base?: string;
+	/** 当前页面在导航中的完整轨迹，最后一项即当前页 */
+	trailHrefs?: string[];
+	depth?: number;
+}
+
+const { items, base = '', trailHrefs = [], depth = 0 } = Astro.props;
+const activeHref = trailHrefs.length ? trailHrefs[trailHrefs.length - 1] : null;
+---
+
+<ul class:list={['sidenav__list', depth > 0 && 'sidenav__sublist']}>
+	{
+		items.map((item) => {
+			const href = `${base}/${item.path}`;
+			const hasChildren = Boolean(item.children?.length);
+			const inTrail = trailHrefs.includes(href);
+			const isActive = activeHref === href;
+			const isOpen = hasChildren && inTrail;
+
+			return (
+				<li class:list={['sidenav__item', isOpen && 'is-open']}>
+					{hasChildren ? (
+						<>
+							<button
+								type="button"
+								data-nav-toggle
+								class:list={['nav-toggle', isActive && 'is-active']}
+								aria-expanded={isOpen ? 'true' : 'false'}
+							>
+								{item.icon && (
+									<svg
+										class="nav-icon"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.7"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+										set:html={item.icon}
+									/>
+								)}
+								<span>{item.label}</span>
+								<svg
+									class="nav-toggle__chevron"
+									viewBox="0 0 16 16"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.8"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="m6 3 5 5-5 5" />
+								</svg>
+							</button>
+							<div class="sidenav__subwrap">
+								<Astro.self
+									items={item.children}
+									base={href}
+									trailHrefs={trailHrefs}
+									depth={depth + 1}
+								/>
+							</div>
+						</>
+					) : (
+						<a
+							href={href}
+							class:list={['nav-link', isActive && 'is-active']}
+							aria-current={isActive ? 'page' : undefined}
+						>
+							{item.icon && (
+								<svg
+									class="nav-icon"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.7"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+									set:html={item.icon}
+								/>
+							)}
+							<span>{item.label}</span>
+						</a>
+					)}
+				</li>
+			);
+		})
+	}
+</ul>
+
+<style>
+	.nav-icon {
+		width: 17px;
+		height: 17px;
+		flex: none;
+		opacity: 0.85;
+	}
+
+	/* 二级项不再重复图标，留出缩进 */
+	.sidenav__sublist .nav-icon {
+		display: none;
+	}
+</style>

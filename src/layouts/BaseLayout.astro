@@ -1,16 +1,76 @@
 ---
+import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
+import SideNav from '../components/SideNav.astro';
 import Footer from '../components/Footer.astro';
+import Toc from '../components/Toc.astro';
+import SearchPalette from '../components/SearchPalette.astro';
+import SiteScripts from '../components/SiteScripts.astro';
+import Wallpaper from '../components/Wallpaper.astro';
+
+interface Heading {
+	depth: number;
+	slug: string;
+	text: string;
+}
+
+interface Props {
+	title: string;
+	description?: string;
+	/** 传入 render() 的 headings 即自动出现右侧目录与三栏布局 */
+	headings?: Heading[] | null;
+	type?: 'website' | 'article';
+	/** 首页等不需要拼接站点名的页面 */
+	bare?: boolean;
+}
+
+const { title, description, headings = null, type = 'website', bare = false } = Astro.props;
+const tocItems = (headings || []).filter((heading) => heading.depth === 2 || heading.depth === 3);
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <title>{Astro.props.title}</title>
-</head>
-<body>
-  <Header />
-  {Astro.children()}
-  <Footer />
-</body>
+	<head>
+		<BaseHead title={title} description={description} type={type} bare={bare} />
+	</head>
+	<body>
+		<a class="skip-link" href="#main">跳到正文</a>
+		<div class="read-progress" id="readProgress" aria-hidden="true"></div>
+
+		<Header />
+
+		<div class:list={['shell', tocItems.length > 0 && 'shell--doc']}>
+			<SideNav />
+			<main class="content" id="main">
+				<slot />
+			</main>
+			{tocItems.length > 0 && <Toc items={tocItems} />}
+		</div>
+
+		<Footer />
+
+		<button type="button" class="back-to-top" id="backToTop" aria-label="回到顶部" title="回到顶部">
+			<svg
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.9"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M12 19V6"></path><path d="m6 12 6-6 6 6"></path>
+			</svg>
+		</button>
+
+		<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="图片预览">
+			<button type="button" class="lightbox__close" id="lightboxClose" aria-label="关闭预览">×</button>
+			<img id="lightboxImage" alt="" />
+		</div>
+
+		<div class="scrim" id="scrim"></div>
+		<SearchPalette />
+		<Wallpaper />
+		<SiteScripts />
+	</body>
 </html>

@@ -1,0 +1,33 @@
+---
+interface Heading {
+	depth: number;
+	slug: string;
+	text: string;
+}
+
+interface Props {
+	items: Heading[];
+}
+
+const { items = [] } = Astro.props;
+const baseDepth = items.length ? Math.min(...items.map((h) => h.depth)) : 2;
+---
+
+<nav class="toc glass" aria-label="本页目录">
+	<p class="toc__title">本页目录</p>
+	<ul class="toc__list">
+		{
+			items.map((heading) => (
+				<li>
+					<a
+						href={`#${heading.slug}`}
+						class:list={['toc__link', heading.depth > baseDepth && 'toc__link--h3']}
+						data-toc-link
+					>
+						{heading.text}
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</nav>
