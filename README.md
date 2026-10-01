@@ -85,18 +85,28 @@ draft: false                     # true 则不参与构建产物
 
 ## 壁纸系统
 
-顶栏齿轮按钮打开「壁纸设置」（右侧 Acrylic 抽屉），支持五种来源模式：
+顶栏齿轮按钮打开「壁纸设置」（右侧 Acrylic 抽屉）。**默认是 Bing 专属**，
+来源模式按从最宽到最窄排列：
 
 | 模式 | 说明 |
 | --- | --- |
-| 全随机 | Bing、二次元与所选游戏混合随机 |
-| Bing 专属 | 只使用 Bing 每日壁纸 |
-| 二次元专属 | 只使用二次元图源 |
-| 游戏专属 | 只使用所选游戏，**与 Bing 互锁**；勾选 1 个即「某游戏专属」，勾选多个即「多游戏专属」 |
+| 全部随机 | Bing、二次元与游戏混合随机（唯一会把 Bing 与二次元混用的模式） |
+| **Bing 专属**（默认） | 只使用 Bing 每日壁纸 |
+| 二次元全部随机 | 全部二次元图源 + 全部游戏图集，**不含 Bing** |
+| 二次元自选 | 只使用自己勾选的图源，**不含 Bing**；选中后展开二级菜单 |
 | 纯渐变 | 不加载图片，只保留内置渐变壁纸 |
+
+「二次元」这里按 **ACG 统称**理解，包含二次元图源与游戏图集。
+「二次元自选」的**二级菜单**里分两组勾选：
+
+- **二次元图源**：Alcy / Mwm / Loliapi
+- **游戏图集**：蔚蓝档案、明日方舟、碧蓝航线（其余四款标注了无法接入的原因，不可勾选）
 
 另有：模糊与压暗滑杆、64 秒缓慢缩放动效、每 5/15/30/60 分钟自动更换。
 全部设置存在 `localStorage` 的 `moying-wallpaper` 键下。
+
+> Bing 与游戏图集互锁：只有「全部随机」会同时使用两者，
+> 其余模式要么只走 Bing，要么只走二次元/游戏。
 
 ### 图源如何接入
 
@@ -168,15 +178,46 @@ node scripts/gen-wallpaper-manifest.mjs
 | `pnpm dev` | 开发服务器，默认 <http://localhost:4321> |
 | `pnpm build` | 构建静态产物到 `dist/` |
 | `pnpm preview` | 本地预览构建结果 |
+| `pnpm verify` | **推送前自检**：构建 + 产物校验（等价于下面两条一起跑） |
+| `pnpm check:links` | 校验产物：关键文件、内部链接、搜索索引、图集清单 |
+| `pnpm check:wallpapers` | 检测壁纸图集直链是否失效（支持 `-- --sample 30`） |
+| `pnpm refresh:wallpapers` | 重新枚举游戏仓库文件名并覆盖图集清单 |
+
+### 维护脚本
+
+`scripts/check-links.mjs` 在构建之后校验 `dist/`：
+关键产物是否齐全（13 项）、所有内部 `href` 能否解析到真实文件、
+`search-index.json` 与 `wallpaper-manifest.json` 是否可解析且非空。
+有问题时退出码为 1，可直接用作 CI 门禁。
+
+`scripts/check-wallpapers.mjs` 逐个探测 474 条图集直链（只取前 1KB），
+用来发现第三方图源腐坏。图集链接失效时重新跑 `refresh:wallpapers` 即可。
 
 ## 部署
 
-`output: 'static'`，产物为纯静态文件，可直接部署到 GitHub Pages。
-`site` 与 `base` 在 `astro.config.mjs` 中配置（当前为 `https://moyingyilang.github.io/`，`base: ''`）。
+`output: 'static'`，产物为纯静态文件，部署到 GitHub Pages，
+工作流在 `.github/workflows/deploy.yml`（push 到 `main` 或手动触发）。
+
+CI 用 `withastro/action@v3`，它内部的 `pnpm/action-setup` 会在
+`version` 为空时回退读取 `package.json` 的 `packageManager` 字段，
+所以 **pnpm 版本由 `package.json` 决定**，不要在 workflow 里重复指定，
+否则两者不一致会报 `ERR_PNPM_BAD_PM_VERSION`。
+
+### 关于 pnpm 12 与 lockfile
+
+项目 pin 了 `pnpm@12.4.0`。pnpm 12 会为它自管理的包管理器版本
+在 `pnpm-lock.yaml` 顶部写入**第二个 YAML 文档**（`packageManagerDependencies`），
+所以该文件由两段 `---` 分隔的文档组成，这是 pnpm 12 的行为，不是文件损坏。
+已实测：pnpm 11 与 pnpm 12 都能正常读取它，`--frozen-lockfile` 均通过。
+
+构建脚本白名单（esbuild / sharp）在 **`pnpm-workspace.yaml`** 里，
+因为 pnpm 12 已不再读取 `package.json` 的 `pnpm` 字段。
 
 ## 说明
 
 - 正文用系统字体渲染，原 Bear Blog 的 Atkinson 字体已从 `astro.config.mjs` 移除，
-  字体文件仍保留在 `src/assets/fonts/`；恢复方法写在配置文件注释里。
+  构建产物不含 woff 文件；`src/assets/fonts/` 下的文件仅为保留恢复路径，恢复方法写在配置注释里。
 - `prefetch` 已开启，站内链接进入视口即预取。
 - 代码高亮为 Shiki 双主题，随 `<html data-theme>` 自动切换。
+- 内容集合只保留一份 `src/content.config.ts`；旧版 `src/content/config.ts`
+  与失效的 `BlogPost.astro` / `HeaderLink.astro` / `FormattedDate.astro` 均已删除。

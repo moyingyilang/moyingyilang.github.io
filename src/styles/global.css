@@ -383,21 +383,6 @@ a:hover {
 	color: var(--text);
 }
 
-/* 品牌图标：MIUI 式圆角方块 + 渐变 */
-.appbar__mark {
-	width: 28px;
-	height: 28px;
-	border-radius: var(--r-sm);
-	display: grid;
-	place-items: center;
-	font-size: 0.9rem;
-	font-weight: 700;
-	color: #fff;
-	background: linear-gradient(135deg, #4f8dff, #a855f7 55%, #22d3ee);
-	box-shadow: 0 2px 8px rgba(79, 141, 255, 0.4);
-	flex: none;
-}
-
 .appbar__spacer {
 	flex: 1 1 auto;
 }
@@ -1837,7 +1822,7 @@ html.reveal-fallback .reveal {
 		padding: 0 0.75rem;
 	}
 
-	.appbar__brand span:not(.appbar__mark) {
+	.appbar__brand span {
 		max-width: 42vw;
 		overflow: hidden;
 		text-overflow: ellipsis;

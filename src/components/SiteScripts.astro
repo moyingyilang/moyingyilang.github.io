@@ -63,7 +63,10 @@
 
 	/* --------------------------------------------------- 导航分组展开 */
 	document.addEventListener('click', (event) => {
-		const toggle = event.target.closest('[data-nav-toggle]');
+		// click 的 target 在类型上是 EventTarget，先收窄再取 closest
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+		const toggle = target.closest('[data-nav-toggle]');
 		if (!toggle) return;
 		const item = toggle.closest('.sidenav__item');
 		if (!item) return;
@@ -176,7 +179,10 @@
 		if (event.target === palette) closePalette();
 	});
 
-	paletteInput?.addEventListener('input', (event) => search(event.target.value));
+	paletteInput?.addEventListener('input', (event) => {
+		const target = event.currentTarget;
+		if (target instanceof HTMLInputElement) search(target.value);
+	});
 	paletteInput?.addEventListener('keydown', (event) => {
 		if (event.key === 'ArrowDown') {
 			event.preventDefault();

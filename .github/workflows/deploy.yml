@@ -20,10 +20,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # withastro/action 内部依次做这几件事（已对照 v3 的 action.yml 核实）：
+      #   1. 探测包管理器：发现 pnpm-lock.yaml 后设 PACKAGE_MANAGER=pnpm
+      #   2. pnpm/action-setup@v4 —— 注意它拿到的 version 是空的，
+      #      此时它会回退去读 package.json 的 packageManager 字段（即 pnpm@12.4.0）。
+      #      所以「pin pnpm 版本」靠的是 package.json，不要删那个字段，
+      #      也不要在这里再传 package-manager，两者都填且不一致会报 ERR_PNPM_BAD_PM_VERSION。
+      #   3. actions/setup-node@v4，带上 pnpm store 缓存
+      #   4. pnpm install → pnpm run build → actions/upload-pages-artifact
       - name: Install, build, and upload
         uses: withastro/action@v3
         with:
-          node-version: 22   # 需要时取消注释
+          # 需与 package.json 的 engines.node (>=22.12.0) 兼容；
+          # actions/setup-node 会把 "22" 解析为最新的 22.x
+          node-version: 22
 
   deploy:
     needs: build

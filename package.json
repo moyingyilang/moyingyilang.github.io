@@ -9,23 +9,21 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "check:links": "node scripts/check-links.mjs",
+    "check:wallpapers": "node scripts/check-wallpapers.mjs",
+    "refresh:wallpapers": "node scripts/gen-wallpaper-manifest.mjs",
+    "verify": "pnpm run build && pnpm run check:links"
   },
   "dependencies": {
-    "@astrojs/mdx": "^5.0.3",
-    "@astrojs/rss": "^4.0.18",
-    "@astrojs/sitemap": "^3.7.2",
-    "astro": "^6.1.5",
-    "sharp": "^0.34.3"
+    "@astrojs/mdx": "^5.0.6",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.4",
+    "astro": "^6.4.8",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "gh-pages": "^6.3.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp"
-    ]
   },
   "packageManager": "pnpm@12.4.0"
 }

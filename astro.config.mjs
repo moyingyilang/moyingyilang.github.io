@@ -34,7 +34,8 @@ export default defineConfig({
 	 * 当前视觉基调是 Fluent (Segoe UI Variable) × MIUI (MiSans)，
 	 * 正文使用平台原生字体栈（见 global.css 的 --font-sans），
 	 * 这样中文排版更贴近系统观感，也不额外下载字体。
-	 * 字体文件仍保留在 src/assets/fonts/ 下。
+	 * 构建产物里不含任何 woff 文件（已核实），
+	 * src/assets/fonts/ 下的两个文件保留下来只是为了下面这条恢复路径可用。
 	 *
 	 * 若要恢复 Atkinson：
 	 *   1. 在此加回 fonts 数组与 fontProviders.local() 配置

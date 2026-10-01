@@ -1,5 +1,5 @@
 ---
-import { GAMES, MODES, availableGames, clientConfig } from '../config/wallpapers';
+import { ANIME_SOURCES, GAMES, MODES, clientConfig } from '../config/wallpapers';
 
 /**
  * 壁纸引擎与「外观设置」面板
@@ -25,7 +25,16 @@ const gameRows = GAMES.map((game) => ({
 	best: bestResolution(game),
 }));
 
-const hasGameSources = availableGames().length > 0;
+const animeRows = ANIME_SOURCES.map((source) => ({
+	id: source.id,
+	label: source.label,
+	// 二级菜单里只放短提示，完整的实测结论留在配置的 verified 字段里
+	hint:
+		source.id === 'loliapi'
+			? '稳定性一般，仅作备选'
+			: '每次请求都是不同图',
+}));
+
 const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0);
 ---
 
@@ -49,47 +58,80 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 
 		<div class="settings__body">
 			<section class="set-group">
-				<h3 class="set-group__title">壁纸来源</h3>
+				<h3 class="set-group__title">
+					壁纸来源
+					<span class="set-group__hint">Bing 与二次元／游戏互锁，只有「全部随机」会把两者混用</span>
+				</h3>
+
 				<div class="set-options" id="modeList" role="radiogroup" aria-label="壁纸来源">
 					{
 						MODES.map((mode) => (
-							<label class="set-option" data-mode={mode.id}>
-								<input type="radio" name="wallpaper-mode" value={mode.id} />
-								<span class="set-option__body">
-									<span class="set-option__label">{mode.label}</span>
-									<span class="set-option__desc">{mode.desc}</span>
-								</span>
-								<span class="set-option__mark" aria-hidden="true" />
-							</label>
-						))
-					}
-				</div>
-			</section>
+							<>
+								<label class="set-option" data-mode={mode.id}>
+									<input type="radio" name="wallpaper-mode" value={mode.id} />
+									<span class="set-option__body">
+										<span class="set-option__label">{mode.label}</span>
+										<span class="set-option__desc">{mode.desc}</span>
+									</span>
+									{mode.submenu ? (
+										<svg
+											class="set-option__chevron"
+											viewBox="0 0 16 16"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.8"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path d="m6 3 5 5-5 5" />
+										</svg>
+									) : (
+										<span class="set-option__mark" aria-hidden="true" />
+									)}
+								</label>
 
-			<section class="set-group">
-				<h3 class="set-group__title">
-					游戏图源
-					<span class="set-group__hint">选 1 个即「某游戏专属」，选多个即「多游戏专属」；与 Bing 互锁</span>
-				</h3>
-				<div class="set-games" id="gameList">
-					{
-						gameRows.map((game) => (
-							<label class:list={['set-game', game.count === 0 && 'is-disabled']} data-game={game.id}>
-								<input type="checkbox" value={game.id} disabled={game.count === 0} />
-								<span class="set-game__label">{game.label}</span>
-								<span class:list={['set-game__meta', game.count > 0 && 'is-ok']}>
-									{game.count > 0 ? `${game.count} 个图集 · 最高 ${game.best}` : '暂无可用图源'}
-								</span>
-								{game.count === 0 && game.note && <span class="set-game__note">{game.note}</span>}
-							</label>
+								{mode.submenu && (
+									<div class="set-subwrap" id="acgPanel">
+										<div class="set-submenu">
+											<p class="set-submenu__title">二次元图源</p>
+											<div class="set-rows" id="animeList">
+												{animeRows.map((source) => (
+													<label class="set-row-item" data-anime={source.id}>
+														<input type="checkbox" value={source.id} />
+														<span class="set-row-item__label">{source.label}</span>
+														<span class="set-row-item__meta">{source.hint}</span>
+													</label>
+												))}
+											</div>
+
+											<p class="set-submenu__title">游戏图集</p>
+											<div class="set-rows" id="gameList">
+												{gameRows.map((game) => (
+													<label
+														class:list={['set-row-item', game.count === 0 && 'is-disabled']}
+														data-game={game.id}
+													>
+														<input type="checkbox" value={game.id} disabled={game.count === 0} />
+														<span class="set-row-item__label">{game.label}</span>
+														<span class:list={['set-row-item__meta', game.count > 0 && 'is-ok']}>
+															{game.count > 0 ? `${game.count} 个图集 · 最高 ${game.best}` : '暂无可用图源'}
+														</span>
+														{game.count === 0 && game.note && (
+															<span class="set-row-item__note">{game.note}</span>
+														)}
+													</label>
+												))}
+											</div>
+
+											<p class="set-note">这一模式只使用上面勾选的图源，不包含 Bing。</p>
+										</div>
+									</div>
+								)}
+							</>
 						))
 					}
 				</div>
-				{
-					!hasGameSources && (
-						<p class="set-note">游戏类图源正在接入中。</p>
-					)
-				}
 			</section>
 
 			<section class="set-group">
@@ -294,23 +336,37 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 			});
 		}
 
+		/**
+		 * 按模式组装候选池
+		 * - all        全部随机：Bing + 全部二次元 + 全部游戏
+		 * - bing       Bing 专属
+		 * - acg        二次元全部随机：全部二次元 + 全部游戏（不含 Bing）
+		 * - acg-custom 二次元自选：只取勾选的二次元图源与游戏（不含 Bing）
+		 * - off        纯渐变
+		 */
 		function buildPool() {
-			const games = cfg.games || [];
-			const gameCandidates = games
+			const allBing = cfg.sources?.bing || [];
+			const allAnime = cfg.sources?.anime || [];
+			const allGames = cfg.games || [];
+
+			const everyGame = allGames.flatMap((game: any) => game.candidates || []);
+			const pickedGame = allGames
 				.filter((game: any) => settings.games.includes(game.id))
 				.flatMap((game: any) => game.candidates || []);
+			const pickedAnime = allAnime.filter((source: any) => settings.animes.includes(source.id));
 
 			switch (settings.mode) {
 				case 'bing':
-					return [...(cfg.sources?.bing || [])];
-				case 'anime':
-					return [...(cfg.sources?.anime || [])];
-				case 'games':
-					return gameCandidates;
+					return [...allBing];
+				case 'acg':
+					return [...allAnime, ...everyGame];
+				case 'acg-custom':
+					return [...pickedAnime, ...pickedGame];
 				case 'off':
 					return [];
+				case 'all':
 				default:
-					return [...(cfg.sources?.bing || []), ...(cfg.sources?.anime || []), ...gameCandidates];
+					return [...allBing, ...allAnime, ...everyGame];
 			}
 		}
 
@@ -368,8 +424,8 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 				if (settings.mode === 'off') {
 					clearWallpaper();
 					setStatus('已关闭图片壁纸，使用内置渐变');
-				} else if (settings.mode === 'games') {
-					setStatus('请先勾选至少一个游戏图源');
+				} else if (settings.mode === 'acg-custom') {
+					setStatus('请至少勾选一个图源');
 				} else {
 					setStatus('当前模式下没有可用图源');
 				}
@@ -432,6 +488,16 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 			panel?.querySelectorAll<HTMLInputElement>('#gameList input[type="checkbox"]').forEach((input) => {
 				input.checked = settings.games.includes(input.value);
 			});
+			panel?.querySelectorAll<HTMLInputElement>('#animeList input[type="checkbox"]').forEach((input) => {
+				input.checked = settings.animes.includes(input.value);
+			});
+
+			// 「二次元自选」的二级菜单：选中时才展开，并把箭头转向下
+			const submenuOpen = settings.mode === 'acg-custom';
+			document.getElementById('acgPanel')?.classList.toggle('is-open', submenuOpen);
+			panel
+				?.querySelector('.set-option[data-mode="acg-custom"]')
+				?.classList.toggle('is-expanded', submenuOpen);
 
 			const blur = panel?.querySelector<HTMLInputElement>('#setBlur');
 			const dim = panel?.querySelector<HTMLInputElement>('#setDim');
@@ -447,11 +513,6 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 			const dimValue = document.getElementById('setDimValue');
 			if (blurValue) blurValue.textContent = `${settings.blur} px`;
 			if (dimValue) dimValue.textContent = `${Math.round(settings.dim * 100)}%`;
-
-			// Bing / 纯渐变模式下淡化游戏区（全随机也会用所选游戏，故仍可操作）
-			document
-				.getElementById('gameList')
-				?.classList.toggle('is-muted', settings.mode === 'off' || settings.mode === 'bing');
 		}
 
 		/* -------------------------------------------------- 事件 */
@@ -469,14 +530,25 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 				return;
 			}
 
-			if (target.closest('#gameList') && target.type === 'checkbox') {
+			// 二级菜单：二次元图源
+			if (target.type === 'checkbox' && target.closest('#animeList')) {
+				const id = target.value;
+				settings.animes = target.checked
+					? [...new Set([...settings.animes, id])]
+					: settings.animes.filter((anime: string) => anime !== id);
+				save();
+				if (settings.mode === 'acg-custom') shuffle();
+				return;
+			}
+
+			// 二级菜单：游戏图集
+			if (target.type === 'checkbox' && target.closest('#gameList')) {
 				const id = target.value;
 				settings.games = target.checked
 					? [...new Set([...settings.games, id])]
 					: settings.games.filter((game: string) => game !== id);
 				save();
-				syncPanel();
-				if (settings.mode === 'games' || settings.mode === 'all') shuffle();
+				if (settings.mode === 'acg-custom') shuffle();
 			}
 		});
 
@@ -722,6 +794,19 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 		transition: all var(--dur-fast) var(--ease-standard);
 	}
 
+	.set-option__chevron {
+		width: 14px;
+		height: 14px;
+		flex: none;
+		color: var(--text-tertiary);
+		transition: transform var(--dur) var(--ease-fluent);
+	}
+
+	.set-option.is-expanded .set-option__chevron {
+		transform: rotate(90deg);
+		color: var(--accent);
+	}
+
 	.set-option:has(input:checked) {
 		background: var(--accent-soft);
 		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -742,62 +827,102 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 		outline-offset: 2px;
 	}
 
-	/* -------------------------------------------------- 游戏多选 */
-	.set-games {
+	/* -------------------------------------------------- 二级菜单 */
+	.set-subwrap {
+		display: grid;
+		grid-template-rows: 0fr;
+		transition: grid-template-rows var(--dur-slow) var(--ease-fluent);
+	}
+
+	.set-subwrap > * {
+		overflow: hidden;
+	}
+
+	.set-subwrap.is-open {
+		grid-template-rows: 1fr;
+	}
+
+	.set-submenu {
+		margin: 0.2rem 0 0.5rem 0.85rem;
+		padding-left: 0.85rem;
+		border-left: 2px solid var(--accent-soft);
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
-		transition: opacity var(--dur) var(--ease-standard);
 	}
 
-	.set-games.is-muted {
-		opacity: 0.5;
+	.set-submenu__title {
+		margin: 0.7rem 0 0.3rem;
+		font-size: 0.72rem;
+		font-weight: 620;
+		letter-spacing: 0.06em;
+		color: var(--text-tertiary);
 	}
 
-	.set-game {
+	.set-submenu__title:first-child {
+		margin-top: 0.3rem;
+	}
+
+	.set-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.set-row-item {
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);
 		align-items: center;
 		gap: 0.1rem 0.6rem;
-		padding: 0.5rem 0.7rem;
+		padding: 0.45rem 0.6rem;
 		border-radius: var(--r-sm);
 		cursor: pointer;
 		transition: background var(--dur-fast) var(--ease-standard);
 	}
 
-	.set-game:hover:not(.is-disabled) {
+	.set-row-item:hover:not(.is-disabled) {
 		background: var(--surface-hover);
 	}
 
-	.set-game.is-disabled {
+	.set-row-item.is-disabled {
 		cursor: not-allowed;
 		opacity: 0.6;
 	}
 
-	.set-game input {
+	/*
+	 * 必须显式指定列位置：若交给自动排布，meta 会落到第 1 列（checkbox 那列），
+	 * 把 auto 列撑宽、把 1fr 的标签列挤到换行。
+	 */
+	.set-row-item input {
+		grid-column: 1;
+		grid-row: 1;
 		width: 15px;
 		height: 15px;
 		accent-color: var(--accent);
 	}
 
-	.set-game__label {
-		font-size: 0.87rem;
+	.set-row-item__label {
+		grid-column: 2;
+		grid-row: 1;
+		font-size: 0.86rem;
 		color: var(--text);
 		min-width: 0;
 	}
 
-	.set-game__meta {
-		font-size: 0.72rem;
+	.set-row-item__meta {
+		grid-column: 2;
+		grid-row: 2;
+		font-size: 0.71rem;
 		line-height: 1.45;
 		color: var(--text-tertiary);
 	}
 
-	.set-game__meta.is-ok {
+	.set-row-item__meta.is-ok {
 		color: var(--accent);
 	}
 
-	.set-game__note {
-		font-size: 0.7rem;
+	.set-row-item__note {
+		grid-column: 2;
+		font-size: 0.69rem;
 		line-height: 1.55;
 		color: var(--text-tertiary);
 	}
@@ -935,7 +1060,7 @@ const galleryTotal = GAMES.reduce((sum, game) => sum + game.galleries.length, 0)
 	}
 
 	.set-note {
-		margin: 0.6rem 0 0;
+		margin: 0.7rem 0 0;
 		font-size: 0.72rem;
 		line-height: 1.6;
 		color: var(--text-tertiary);

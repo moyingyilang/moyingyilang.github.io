@@ -9,7 +9,7 @@ const latest = posts.slice(0, 4);
 const menuNodes = flattenMenu();
 const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 
-const SECTION_DESC = {
+const SECTION_DESC: Record<string, string> = {
 	tech: '物理、化学与实验类笔记',
 	code: '容器、开发语言与开发环境',
 	notes: '项目进度、攻略、PCB 与刷机',

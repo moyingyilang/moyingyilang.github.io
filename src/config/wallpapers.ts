@@ -177,26 +177,35 @@ export const GAMES: GameEntry[] = [
    模式
    -------------------------------------------------------------------------- */
 export interface WallpaperMode {
-	id: 'all' | 'bing' | 'anime' | 'games' | 'off';
+	id: 'all' | 'bing' | 'acg' | 'acg-custom' | 'off';
 	label: string;
 	desc: string;
+	/** 选中后在下方展开二级菜单（用于细选图源） */
+	submenu?: boolean;
 }
 
+/**
+ * 模式层级：从最宽到最窄
+ *
+ * 「二次元」这里按 ACG 统称理解，包含二次元图源与游戏图集。
+ * Bing 与游戏互锁：只有「全部随机」会把两者混在一起，
+ * 其余模式要么只走 Bing，要么只走二次元/游戏。
+ */
 export const MODES: WallpaperMode[] = [
-	{ id: 'all', label: '全随机', desc: 'Bing、二次元与所选游戏混合随机' },
+	{ id: 'all', label: '全部随机', desc: 'Bing、二次元与游戏混合随机' },
 	{ id: 'bing', label: 'Bing 专属', desc: '只使用 Bing 每日壁纸' },
-	{ id: 'anime', label: '二次元专属', desc: '只使用二次元图源' },
-	{ id: 'games', label: '游戏专属', desc: '只使用所选游戏，与 Bing 互斥' },
+	{ id: 'acg', label: '二次元全部随机', desc: '全部二次元图源与游戏图集' },
+	{ id: 'acg-custom', label: '二次元自选', desc: '自己勾选要启用的图源', submenu: true },
 	{ id: 'off', label: '纯渐变', desc: '不加载图片，只保留内置渐变壁纸' },
 ];
 
 export const DEFAULT_SETTINGS = {
-	mode: 'all' as WallpaperMode['id'],
-	/**
-	 * 参与「全随机」与「游戏专属」的游戏 id。
-	 * 默认勾选全部有图源的游戏，这样「全随机」才是字面意义上的全随机。
-	 */
+	/** 默认使用 Bing 每日壁纸 */
+	mode: 'bing' as WallpaperMode['id'],
+	/** 「二次元自选」模式下启用的游戏 id；默认全部勾选 */
 	games: GAMES.filter((game) => game.galleries.length > 0).map((game) => game.id),
+	/** 「二次元自选」模式下启用的二次元图源 id；默认全部勾选 */
+	animes: ANIME_SOURCES.map((source) => source.id),
 	/** 图片高斯模糊，px */
 	blur: 0,
 	/** 压暗遮罩不透明度 0–0.6 */
