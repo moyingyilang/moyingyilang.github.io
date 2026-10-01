@@ -17,11 +17,11 @@
     "verify": "pnpm run build && pnpm run check:links"
   },
   "dependencies": {
-    "@astrojs/mdx": "^5.0.6",
+    "@astrojs/mdx": "^8.0.2",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
-    "astro": "^6.4.8",
-    "sharp": "^0.34.5"
+    "astro": "^7.3.5",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "gh-pages": "^6.3.0"

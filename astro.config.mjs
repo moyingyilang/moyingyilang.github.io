@@ -10,6 +10,18 @@ export default defineConfig({
 	output: 'static',
 	integrations: [mdx(), sitemap()],
 
+	/*
+	 * 空白处理：Astro 7 把默认值从 true 改成了 'jsx'（按 JSX 规则剥离空白）。
+	 * 本项目的模板里有依赖「源码换行缩进」产生行内空格的写法
+	 * （例如页脚 `代码以 <a>AGPL v3.0</a> 授权`），在 'jsx' 下这些空格会消失，
+	 * 出现「代码以AGPL v3.0授权」这类粘连。
+	 *
+	 * 官方升级指南把 true 作为依赖 HTML 空白规则站点的迁移路径，
+	 * 这里显式保留，以维持与 Astro 6 时期完全一致的渲染结果。
+	 * 若将来要改用 'jsx' 默认值，需先把模板里的行内空格改成显式写法（{' '}）。
+	 */
+	compressHTML: true,
+
 	// 站点内所有链接在视口内即预取，跳转更接近原生应用的即时感
 	prefetch: {
 		prefetchAll: true,

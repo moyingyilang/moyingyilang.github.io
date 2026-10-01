@@ -222,6 +222,31 @@ CI 用 `withastro/action@v3`，它内部的 `pnpm/action-setup` 会在
 - 内容集合只保留一份 `src/content.config.ts`；旧版 `src/content/config.ts`
   与失效的 `BlogPost.astro` / `HeaderLink.astro` / `FormattedDate.astro` 均已删除。
 
+### Astro 7 升级注意事项
+
+项目已升级到 **Astro 7.3.5 + @astrojs/mdx 8.0.2**（Astro 7 内部换成 Rust 的 rolldown 打包器）。
+两处需要留意的破坏性变更：
+
+1. **`compressHTML: true` 是刻意保留的。**
+   Astro 7 把默认值从 `true` 改成 `'jsx'`（按 JSX 规则剥离空白）。本项目的模板里有依赖
+   「源码换行缩进」产生行内空格的写法，在 `'jsx'` 下会粘连成 `代码以AGPL v3.0授权`。
+   已实测：保留 `true` 时，8 个页面的渲染文本与 Astro 6 时期逐字一致。
+   若将来要改用 `'jsx'` 默认值，需先把模板里的行内空格改成显式写法（`{' '}`）。
+
+2. **`sharp` 必须作为直接依赖保留。**
+   它声明了 `peerDependenciesMeta` 却没有对应的 `peerDependencies`，pnpm 在解析时会生成
+   带 peer 后缀的目录（`sharp@0.35.5_@types+node@24.19.0`）。若 lockfile 与 `node_modules`
+   不一致，根目录会出现指向 `sharp@0.35.5`（无后缀）的**断链**，
+   于是 Astro 打包进 `dist/.prerender/` 的图片服务找不到 sharp，构建报
+   `Could not find Sharp`。**CI 是干净安装，遇到这个问题会直接部署失败。**
+
+   判断方法：`node -e "import('sharp')"` 应当在项目根可加载。
+   若出现断链，删除 `node_modules` 与 `pnpm-lock.yaml` 后重新 `pnpm install` 重建 lockfile 即可。
+
+3. **Markdown 表格现在能正常渲染了。**
+   Astro 6 时期（Sätteri 之前的管线）Markdown 表格被渲染成一整段字面竖线文本，
+   线上页面实测 `<table>` 数量为 0；升级后渲染为真正的 `<table>`（4 行 12 单元格）。
+
 ## 许可
 
 本站代码以 **GNU Affero General Public License v3.0**（`AGPL-3.0-only`）授权，
