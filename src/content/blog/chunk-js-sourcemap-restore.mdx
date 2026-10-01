@@ -1,0 +1,109 @@
+---
+title: chunk.js / css.map 还原总结
+description: 从 Source Map 还原打包产物的可行路径：shuji / reverse-sourcemap 批量还原、Chrome DevTools 临时查看、deloom / webcrack / Prettier 辅助，以及没有 .map 时的能力边界。
+date: 2026-10-01
+category: reverse
+tags:
+  - Source Map
+  - 逆向
+  - 前端构建
+  - Webpack
+  - 调试
+---
+
+> 适用范围：调试自己负责的项目、安全审计、学习构建产物的组织结构。
+> 动手前请确认你对目标代码有合法授权——未经授权还原他人代码可能涉及法律风险。
+
+## 一、核心结论
+
+- **`chunk.js`、`.css.map` 这类文件通常不是被加密**，而是被压缩、打包、混淆
+- **还原的关键是 Source Map（`.map` 文件）**
+- **有 `.map`**：可以较大程度还原原始 JS / CSS / Less / Sass 等源码
+- **无 `.map`**：几乎无法完美还原，只能格式化代码，让排版更易读
+- 操作前请确认你有合法授权，例如调试自己的项目、安全审计等
+
+## 二、还原方法
+
+### 1. 专业工具批量还原（推荐）
+
+| 工具 | 用途 | 示例 |
+| --- | --- | --- |
+| `shuji` | 从 Source Map 还原 JS / CSS | `shuji file.js.map -o ./output` |
+| `reverse-sourcemap` | 批量还原，支持目录 | `reverse-sourcemap -o output -v app.js.map` |
+| `getfrontend` | 自动发现页面 Chunk 并下载 map 还原 | 适合复杂单页应用 |
+
+批量目录示例：
+
+```bash
+reverse-sourcemap -o output -v ./static/js/
+```
+
+### 2. 浏览器开发者工具临时查看
+
+1. 打开 Chrome DevTools，按 `F12`
+2. 进入 **Sources** 面板
+3. 确保开启：
+   - Enable JavaScript source maps
+   - Enable CSS source maps
+4. 找到目标文件，点击左下角 `{}` 按钮进行 Pretty Print
+5. 适合临时查看，不适合批量还原
+
+### 3. 辅助工具
+
+| 工具 | 用途 |
+| --- | --- |
+| `deloom` | 解包 Webpack 等打包工具生成的 Bundle，提取独立模块 |
+| `webcrack` | 反混淆，处理变量名混淆、控制流平坦化等 |
+| `Prettier` | 无 `.map` 时格式化代码，提升可读性 |
+
+## 三、安装 shuji
+
+### 1. 安装 Node.js
+
+`shuji` 依赖 Node.js 环境。
+
+- 建议使用较新版本 Node.js
+- `shuji@0.8.0` 要求 Node.js `>=14.15.0`，更新的版本要求会更高
+- 未安装请前往 Node.js 官网下载安装
+
+### 2. 全局安装 shuji
+
+```bash
+npm install --global shuji
+```
+
+macOS / Linux 如果权限报错，可使用：
+
+```bash
+sudo npm install --global shuji
+```
+
+### 3. 验证安装
+
+```bash
+shuji -V
+```
+
+显示版本号即安装成功。
+
+### 4. 使用示例
+
+```bash
+shuji file.js.map -o ./output
+```
+
+## 四、推荐操作流程
+
+1. 先查找是否存在对应 `.map` 文件
+2. 如果 `.map` 齐全，优先使用 `shuji` 或 `reverse-sourcemap` 批量还原
+3. 如果只是临时查看，用 Chrome DevTools 的 Pretty Print
+4. 如果没有 `.map`，只能用 `Prettier` 等工具格式化，无法完美还原
+5. 遇到 Webpack Bundle 或混淆代码，可尝试 `deloom`、`webcrack` 辅助
+
+## 五、注意事项
+
+- **合法性**：还原代码前确认有合法授权
+- **无 `.map` 限制**：没有 Source Map 时，几乎不可能还原原始变量名、注释和目录结构
+- **Node.js 环境**：`shuji`、`reverse-sourcemap` 等工具通常需要 Node.js
+- **权限问题**：macOS / Linux 全局安装可能需要 `sudo`
+- **包名问题**：一般直接使用 `shuji` 即可，部分旧文档提到的分支包名不一定需要

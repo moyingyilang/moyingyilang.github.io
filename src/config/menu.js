@@ -59,6 +59,7 @@ export const MENU_DATA = [
 			{ label: '容器与运维', path: 'ops' },
 			{ label: '网络与协议', path: 'network' },
 			{ label: 'Android 与刷机', path: 'android' },
+			{ label: '逆向与调试', path: 'reverse' },
 		],
 	},
 	{
