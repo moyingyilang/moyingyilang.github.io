@@ -27,3 +27,7 @@ pnpm-debug.log*
 # （drafts/endfield.md 含已从《终末地》一文中删除的对抗性内容）
 drafts/
 endfield.md
+
+# 设备应用清单（个人画像数据，仅用于本地筛选，不要提交）
+apps.txt
+app.txt
