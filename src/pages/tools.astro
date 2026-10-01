@@ -71,6 +71,12 @@ const APP_GROUPS = [
 				badge: '官网',
 			},
 			{
+				title: 'DroidVM',
+				desc: '在安卓里跑一个完整的 Linux 虚拟机。要在隔离环境里试危险操作时，比直接动主力机安全。',
+				href: 'https://github.com/Droid-VM/DroidVM',
+				badge: 'GitHub',
+			},
+			{
 				title: 'HttpCanary',
 				desc: 'HTTP／HTTPS 抓包工具，配合证书可看明文请求。⚠️ 官方自 2021 年起停止维护，新系统上可能无法正常工作。',
 				href: 'https://github.com/MegatronKing/HttpCanary',
@@ -185,7 +191,84 @@ const APP_GROUPS = [
 		],
 	},
 	{
-		label: '日常与娱乐',
+		label: '办公与效率',
+		items: [
+			{
+				title: '高德地图',
+				desc: '导航与实时路况，公交地铁换乘查询比多数地图应用准。',
+				href: 'https://www.amap.com/',
+				badge: '官网',
+			},
+			{
+				title: 'WPS Office',
+				desc: '手机上看和改 Word／Excel／PPT。排版兼容性比多数轻量办公应用稳，打开别人发来的文档不容易串版。',
+				href: 'https://www.wps.cn/',
+				badge: '官网',
+			},
+			{
+				title: '扫描全能王',
+				desc: '拍照转文档，自动裁边、增强并做 OCR。纸质资料、实验记录电子化靠它。',
+				href: 'https://www.camscanner.com/',
+				badge: '官网',
+			},
+			{
+				title: 'CAD 看图',
+				desc: '在手机上查看 3D CAD 模型并做简单编辑，临时看图纸够用。',
+				href: 'https://play.google.com/store/apps/details?id=com.wuweido.cad',
+				badge: 'Play',
+			},
+			{
+				title: 'Materializr',
+				desc: '开源参数化 3D CAD：约束草图、实体建模、螺纹、STL／STEP 导出，手机上就能画零件。',
+				href: 'https://github.com/materializr-cad/materializr',
+				badge: 'GitHub',
+			},
+			{
+				title: '腾讯会议',
+				desc: '视频会议，支持屏幕共享与本地录制。',
+				href: 'https://meeting.tencent.com/',
+				badge: '官网',
+			},
+			{
+				title: 'QQ 邮箱',
+				desc: '邮件收发，附件与文件中转做得比较顺手。',
+				href: 'https://mail.qq.com/',
+				badge: '官网',
+			},
+			{
+				title: 'VNC Viewer',
+				desc: '远程桌面客户端，连自己的电脑看图形界面。',
+				href: 'https://www.realvnc.com/',
+				badge: '官网',
+			},
+			{
+				title: '网易 UU 远程',
+				desc: '远程控制电脑，手机当远控端，临时改个文件不用开电脑。',
+				href: 'https://uu.163.com/',
+				badge: '官网',
+			},
+			{
+				title: '自动点击器',
+				desc: '连点与手势录制，处理重复操作时省事。',
+				href: 'https://app.mi.com/details?id=com.zidongdianji',
+				badge: '小米商店',
+			},
+			{
+				title: '123 云盘',
+				desc: '免费 2T 空间的网盘，上传下载速度尚可，用作资料中转。',
+				href: 'https://www.123pan.com/',
+				badge: '官网',
+			},
+			{
+				title: 'Bing 壁纸',
+				desc: '微软官方的每日壁纸应用，自动换桌面背景。本站壁纸系统的灵感来源之一。',
+				href: 'https://bingwallpaper.microsoft.com/',
+				badge: '官网',
+			},
+		],
+	},
+	{
+		label: '媒体与阅读',
 		items: [
 			{
 				title: 'Via',
@@ -197,6 +280,18 @@ const APP_GROUPS = [
 				title: 'Firefox',
 				desc: '开源浏览器，支持扩展，隐私控制比多数国产浏览器清楚。',
 				href: 'https://www.mozilla.org/firefox/',
+				badge: '官网',
+			},
+			{
+				title: '哔哩哔哩',
+				desc: '视频社区。技术类教程与实况内容主要在这里看。',
+				href: 'https://www.bilibili.com/',
+				badge: '官网',
+			},
+			{
+				title: '必剪',
+				desc: 'B 站出的视频剪辑工具，手机端够用，导出直接投 B 站。',
+				href: 'https://bcut.bilibili.cn/',
 				badge: '官网',
 			},
 			{
@@ -212,33 +307,15 @@ const APP_GROUPS = [
 				badge: 'GitHub',
 			},
 			{
-				title: 'Fold Craft Launcher',
-				desc: '在安卓手机上运行 Minecraft Java 版，支持装模组与整合包。',
-				href: 'https://github.com/FCL-Team/FoldCraftLauncher',
-				badge: 'GitHub',
-			},
-			{
-				title: 'Materializr',
-				desc: '开源参数化 3D CAD：约束草图、实体建模、螺纹、STL／STEP 导出，手机上就能画零件。',
-				href: 'https://github.com/materializr-cad/materializr',
-				badge: 'GitHub',
-			},
-			{
-				title: '自动点击器',
-				desc: '连点与手势录制，做重复操作时省事。',
-				href: 'https://app.mi.com/details?id=com.zidongdianji',
-				badge: '小米商店',
-			},
-			{
-				title: '123 云盘',
-				desc: '免费 2T 空间的网盘，上传下载速度尚可，用作资料中转。',
-				href: 'https://www.123pan.com/',
+				title: '番茄小说',
+				desc: '在线小说阅读，离线缓存做得方便。',
+				href: 'https://fanqienovel.com/',
 				badge: '官网',
 			},
 			{
-				title: 'Telegram',
-				desc: '即时通讯，频道与机器人生态完善，常用来订阅技术资讯。',
-				href: 'https://telegram.org/',
+				title: '小黑盒',
+				desc: '游戏资讯、史低价格与战绩查询。',
+				href: 'https://www.xiaoheihe.cn/',
 				badge: '官网',
 			},
 			{
@@ -254,10 +331,28 @@ const APP_GROUPS = [
 				badge: '官网',
 			},
 			{
+				title: 'Telegram',
+				desc: '即时通讯，频道与机器人生态完善，常用来订阅技术资讯。',
+				href: 'https://telegram.org/',
+				badge: '官网',
+			},
+			{
 				title: 'DeepSeek',
-				desc: '常用的大模型助手，本站的 AI 协作也用的这一家的模型。',
+				desc: '常用的大模型助手。本站的 AI 协作也用的这一家的模型。',
 				href: 'https://www.deepseek.com/',
 				badge: '官网',
+			},
+			{
+				title: '豆包',
+				desc: '另一个常用的大模型助手，日常问答与整理资料。',
+				href: 'https://www.doubao.com/',
+				badge: '官网',
+			},
+			{
+				title: 'Fold Craft Launcher',
+				desc: '在安卓手机上运行 Minecraft Java 版，支持装模组与整合包。',
+				href: 'https://github.com/FCL-Team/FoldCraftLauncher',
+				badge: 'GitHub',
 			},
 		],
 	},
