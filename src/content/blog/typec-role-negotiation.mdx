@@ -1,0 +1,189 @@
+---
+title: Type-C DRP、TRY.SNK 与 TRY.SRC：从单片机视角理解角色协商
+description: USB Type-C 双角色端口如何决定谁供电——CC 引脚上的 Rp/Rd、DRP 的定时交替，以及 TRY.SNK / TRY.SRC 两种带倾向的策略。附单片机侧状态机伪代码，以及「移动电源给笔记本充不上电」的成因分析。
+date: 2026-10-01
+# category 对应 src/config/menu.js 里叶子节点的 path
+category: embedded
+tags: ['USB Type-C', 'CC', '角色协商', '单片机', '电源']
+---
+
+## 1. 为什么需要角色协商
+
+USB Type-C 接口支持正反插，也支持设备之间动态确定「谁供电、谁受电」。两个都支持双角色的设备连在一起时，必须有一套规则快速决定角色，否则就会出现「都等着对方供电」或「都抢着供电」的混乱。
+
+这套规则的核心，就是 CC 引脚上的电阻状态和 Try 策略。
+
+## 2. 硬件基础：CC 引脚与 Rp/Rd
+
+Type-C 接口里有 CC1、CC2 两根线，角色协商全靠它们。
+
+- **Source（供电方）**：在 CC 上接 Rp 上拉电阻（到 VBUS 或 3.3 V）
+- **Sink（受电方）**：在 CC 上接 Rd 下拉电阻（到 GND）
+- **DRP（双角色）**：没有固定电阻，而是周期性切换——一会儿输出 Rp，一会儿输出 Rd
+
+单片机要做的，就是控制模拟开关或 GPIO，在 CC 脚上切换 Rp/Rd，同时用 ADC 读 CC 电压，判断对方是什么角色。
+
+## 3. 五种角色与优先级
+
+可以按「供电意愿」排成一条轴：
+
+> SRC（适配器／充电器）→ TRY.SRC（充电宝）→ DRP（笔记本）→ TRY.SNK（手机）→ SNK（OTG U 盘／鼠标／耳机）
+
+- **SRC**：纯供电，一直输出 Rp，驱动 VBUS
+- **SNK**：纯受电，一直输出 Rd，等待 VBUS
+- **DRP**：无倾向，周期切换 Rp/Rd，谁先被对方认出来，谁就当对应角色
+- **TRY.SRC**：DRP 的变种，倾向抢着当 Source
+- **TRY.SNK**：DRP 的变种，倾向当 Sink
+
+注意：TRY.SRC 和 TRY.SNK 本质上仍是 DRP，只是带有明确的角色偏好。规范规定，如果端口同时实现 TRY.SRC 和 TRY.SNK，同一时间只能启用其中一个。
+
+## 4. 普通 DRP 的工作方式
+
+最简单的 DRP 状态机：
+
+```c
+while (1) {
+    set_cc_as_rp();      // 输出 Rp
+    delay_ms(50);
+    if (adc_read_cc() == VOLTAGE_RD) {  // 检测到对方是 Sink
+        role = SRC;
+        break;
+    }
+
+    set_cc_as_rd();      // 输出 Rd
+    delay_ms(50);
+    if (adc_read_cc() == VOLTAGE_RP) {  // 检测到对方是 Source
+        role = SNK;
+        break;
+    }
+}
+```
+
+这就是 DRP：来回切换，谁先被对方认出来，谁就定角色。
+
+但问题在于——两个纯 DRP 碰一起，结果可能随机：可能你的设备想供电，结果被对方供了。TRY.SNK 和 TRY.SRC 就是为了解决这个「随机性」。
+
+## 5. TRY.SNK：优先受电
+
+适用设备：手机、耳机、U 盘——希望别人给我供电，或者至少别让我供电。
+
+单片机逻辑：
+
+1. 上电后，先把自己做成 Sink：CC 脚输出 Rd，并保持一段时间（规范里的 `tDRPTry`，约 10~20 ms）
+2. 在这段时间里不驱动 VBUS，只检测 CC 电压
+3. 然后判断：
+   - 如果检测到对方是 Source（Rp）：保持 Sink，由对方供电
+   - 如果检测到对方也是 Sink（Rd）：两个都想要电，没人供电。这时 TRY.SNK 必须切换成 Source，输出 Rp 并驱动 VBUS，反过来给对方供电
+
+伪代码：
+
+```c
+void try_snk(void) {
+    set_cc_as_rd();          // 先装 Sink
+    delay_ms(tDRPTry);       // 等待一小段时间
+    voltage = adc_read_cc();
+
+    if (voltage == VOLTAGE_RP) {
+        // 对方是 Source，我继续当 Sink
+        role = SNK;
+    } else if (voltage == VOLTAGE_RD) {
+        // 对方也是 Sink，没人供电，我被迫当 Source
+        set_cc_as_rp();
+        enable_vbus();
+        role = SRC;
+    }
+}
+```
+
+> **一句话**：TRY.SNK 先躺平等人充电；如果发现对方也躺平，只好自己站起来供电。
+
+规范中，TRY.SNK 在 `TryWait.SNK` 状态要求端口在 `tDRPTry` 时间内不驱动 VBUS，CC1 和 CC2 均独立通过 Rd 接地，之后才开始监测对方是否呈现 Rp。
+
+## 6. TRY.SRC：优先供电
+
+适用设备：移动电源、笔记本、车机——希望我给对方供电，而不是被对方吸电。
+
+单片机逻辑：
+
+1. 上电后，先假装 Sink：CC 脚输出 Rd。为什么？为了先看看有没有现成的 VBUS
+2. 如果检测到 VBUS 出现（说明对方可能是 Source，或 DRP 正在供电），等待 `tDRPTry` 时间
+3. 然后强行切换成 Source：把 CC 从 Rd 改成 Rp，并开始驱动 VBUS
+4. 再判断对方反应：
+   - 如果对方是 DRP 或 TRY.SNK：它检测到我的 Rd 消失，就会释放 VBUS，让我供电。成功
+   - 如果对方是纯 Source（死板的充电器）：它不会释放 VBUS，我强行输出 Rp 会导致冲突。这时 TRY.SRC 会检测到 VBUS 仍然存在，于是放弃争夺，回到 Sink 状态
+
+伪代码：
+
+```c
+void try_src(void) {
+    set_cc_as_rd();          // 先装 Sink，等 VBUS
+    while (!vbus_present()); // 等待对方供电
+    delay_ms(tDRPTry);
+
+    set_cc_as_rp();          // 抢！切换成 Source
+    enable_vbus();
+
+    if (vbus_still_present() && cc_voltage_conflict()) {
+        // 对方是纯 Source，抢不过
+        disable_vbus();
+        set_cc_as_rd();
+        role = SNK;
+    } else {
+        role = SRC;
+    }
+}
+```
+
+> **一句话**：TRY.SRC 先装孙子等电来，电来了就翻脸抢着供电；如果对方是硬茬子充电器，就继续装孙子。
+
+规范中，TRY.SRC 初始呈现 Rd，等待 VBUS 出现后进入 `Try.SRC` 状态，然后通过 Rp 上拉 CC 引脚。该端口在 `tDRPTry` 期间不驱动 VBUS 或 VCONN。当标准 DRP 检测到 TRY.SRC 上的 Rd 「消失」（被 Rp 取代）后，会关闭 VBUS 输出并切换到 Rd；TRY.SRC 检测到对方的 Rd 后，随即启用 VBUS 输出。
+
+## 7. 实际开发：用 PD 控制器而非 GPIO
+
+实际项目中，你不会真用 GPIO 去模拟 Rp/Rd 切换，太麻烦且不可靠。通常用 Type-C PD 控制器芯片，比如：
+
+- **FUSB302**：I2C 接口，便宜
+- **TPS6598x**：TI，支持 TRY.SRC / TRY.SNK 寄存器配置
+- **CYPD3177**：英飞凌
+
+单片机通过 I2C 写寄存器，告诉 PD 芯片「我要做 TRY.SNK」或「我要做 TRY.SRC」。PD 芯片自己处理 CC 物理层和状态机，单片机只需要读状态、控制 VBUS 开关。
+
+例如配置 TPS6598x 为 TRY.SRC：
+
+```c
+i2c_write(TPS6598x_ADDR, REG_ROLE_CTRL, TRY_SRC_MODE);
+```
+
+然后轮询状态寄存器，看最终协商成了 SRC 还是 SNK。
+
+## 8. 实际痛点：移动电源与笔记本
+
+市面上的移动电源普遍无法给部分笔记本电脑充电，或者出现「笔记本反过来给移动电源充电」的尴尬局面。
+
+根本原因在于，Chromebook、华为 MateBook 等笔记本的 CC 逻辑采用了 TRY.SRC 策略。当这类笔记本连接到一个普通 DRP 移动电源时：
+
+1. 笔记本的 TRY.SRC 先装 Sink，等移动电源供电
+2. 移动电源的普通 DRP 检测到对方 Rp，就乖乖当 Sink 了
+3. 然后笔记本强行切 Rp 抢 Source，移动电源被迫成为 Sink
+4. 结果：移动电源被笔记本「吸电」
+
+要解决这个问题，移动电源端也需要实现 TRY.SRC 策略，才能在角色协商中与笔记本「对等争夺」。或者把移动电源配置成纯 SRC——但那样它就不能当设备用了。
+
+## 9. 总结表格
+
+| 角色 | CC 初始 | 目标 | 单片机行为 |
+| --- | --- | --- | --- |
+| SRC | Rp | 供电 | 一直输出 Rp，驱动 VBUS |
+| SNK | Rd | 受电 | 一直输出 Rd，等待 VBUS |
+| DRP | Rp/Rd 交替 | 随机 | 定时切换，谁先认谁 |
+| TRY.SNK | Rd（先保持） | 优先受电 | 先当 Sink，对方也是 Sink 才当 Source |
+| TRY.SRC | Rd（起步） | 优先供电 | 先当 Sink 等 VBUS，然后抢当 Source |
+
+## 10. 一句话记忆
+
+- **纯 DRP** = 墙头草，无倾向，随机协商
+- **TRY.SRC** = 偏向供电
+- **TRY.SNK** = 偏向受电
+- 纯粹中间那个 = DRP，双角色端口，无供电或受电倾向
+
+两个纯 DRP 碰一起，结果可能随机——这正是 Try 策略要解决的问题。
