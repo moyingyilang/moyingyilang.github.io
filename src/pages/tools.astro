@@ -541,6 +541,30 @@ const siteTotal = SITE_GROUPS.reduce((sum, group) => sum + group.items.length, 0
 				</div>
 			))
 		}
+
+		<!--
+			彩蛋奖励：在关于页触发过鲸鱼娘之后才出现。
+			基础态就是 hidden，由 WhaleEgg 组件读 localStorage 后揭开 ——
+			没有 JS 本来也不可能解锁，所以隐藏是正确的默认。
+		-->
+		<div class="tool-group" data-egg-reward hidden>
+			<h3 class="tool-group__head glass">
+				彩蛋
+				<span class="tool-group__count">1</span>
+			</h3>
+			<div class="grid grid--2">
+				<a class="card reveal" href="#" data-open-whale>
+					<span class="card__arrow">🐋</span>
+					<div class="tool__head">
+						<h4 class="card__title">看看大肥鱼</h4>
+						<span class="badge badge--muted">已解锁</span>
+					</div>
+					<p class="card__desc">
+						DeepSeek娘 · 蓝色大肥鱼。附角色百科与随机一张表情包的入口。
+					</p>
+				</a>
+			</div>
+		</div>
 	</section>
 
 	<section class="tool-section">

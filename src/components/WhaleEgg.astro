@@ -1,0 +1,301 @@
+---
+/**
+ * 鲸鱼娘彩蛋（全站组件）
+ *
+ * 放在 BaseLayout 里，因此**任何页面都能触发** —— 工具页那张
+ * 「看看大肥鱼」卡片就是靠它打开的，不必为此在工具页重复一份弹层。
+ *
+ * 两种触发方式：
+ * - [data-egg-word]  关于页「DeepSeek Harness / deepseek-flash」两处字样，
+ *                    快速连点五次（间隔超过 RAPID_MS 即重置）
+ * - [data-open-whale] 工具页解锁后出现的卡片，点一下直接看
+ *
+ * 图片是本地文件（public/easter-egg/），不请求任何外部接口。
+ * 「看看大肥鱼」解锁后会记住，之后从工具页也能直接打开。
+ */
+const WIKI_URL = 'https://aigengtu.com/zh/whale-chan';
+
+/**
+ * 梗鲸站上的表情包条目 id。
+ *
+ * 取自角色页上的链接（**实测存在才收进来**）：该站的 id 并不连续，
+ * 例如 1500 是 404，所以不能随机生成，只能固化这份已验证的列表。
+ * 这里只做外链跳转，不搬运也不热链他们的图片。
+ */
+const MEME_IDS = [
+	1, 156, 305, 445, 582, 781, 911, 1042, 1172, 1350, 1484, 1627, 1628, 1629, 1630, 1631, 1632, 1633,
+	1634,
+];
+---
+
+<div class="ds-egg" id="dsEgg" hidden>
+	<div class="ds-egg__logo" aria-hidden="true">
+		<svg viewBox="0 0 64 44" fill="none" aria-hidden="true">
+			<path
+				d="M3 25c1-6 6-11 13-13 8-2 16-1 22 3 4-4 8-10 10-15 1-2 3-1 3 1 0 7-2 13-6 17 2 4 2 9 0 12-3 6-10 9-19 9-11 0-20-5-23-14Z"
+				fill="currentColor"></path>
+			<circle cx="19" cy="21" r="2.2" fill="#fff"></circle>
+		</svg>
+	</div>
+
+	<figure class="ds-egg__frame">
+		<img class="ds-egg__art" id="dsEggArt" src="/easter-egg/deepseek-whale.png" alt="DeepSeek 鲸鱼娘" />
+		<figcaption class="ds-egg__meta">
+			<span>DeepSeek娘 · 蓝色大肥鱼</span>
+			<a href={WIKI_URL} target="_blank" rel="noopener noreferrer">角色百科 ↗</a>
+			<a id="dsEggRandom" href={WIKI_URL} target="_blank" rel="noopener noreferrer">随机一张表情包 ↗</a>
+		</figcaption>
+	</figure>
+</div>
+
+<script type="application/json" id="whale-egg-data" set:html={JSON.stringify({ memeIds: MEME_IDS })} />
+
+<script>
+	/*
+	 * 彩蛋逻辑。
+	 *
+	 * 每点一次「关于」页的字样蓝色加深一档（0→5），两处共用一个计数；
+	 * 两次点击间隔超过 RAPID_MS 就重置，所以必须"快速"点。
+	 * 满五次后播入场：图标从点击位置移到屏幕中央并放大，随后放出图片。
+	 *
+	 * 首次放出后会写入 localStorage 并解锁工具页那张卡片。
+	 */
+	const RAPID_MS = 700;
+	const NEEDED = 5;
+	const UNLOCK_KEY = 'moying-egg-whale';
+	/** 表情包 id 走 JSON 标签传入：脚本要保持可打包，所以不用 define:vars */
+	const MEME_IDS: number[] = JSON.parse(
+		document.getElementById('whale-egg-data')?.textContent || '{}',
+	).memeIds || [];
+
+	const egg = document.getElementById('dsEgg');
+	const words = [...document.querySelectorAll('[data-egg-word]')];
+	const openers = [...document.querySelectorAll('[data-open-whale]')];
+	const rewards = [...document.querySelectorAll('[data-egg-reward]')];
+
+	if (egg) {
+		const art = document.getElementById('dsEggArt') as HTMLImageElement | null;
+		const randomLink = document.getElementById('dsEggRandom');
+		let count = 0;
+		let stepTimer = 0;
+		/** 播放中不再接受点击，避免叠加播放 */
+		let playing = false;
+
+		const readUnlocked = () => {
+			try {
+				return localStorage.getItem(UNLOCK_KEY) === '1';
+			} catch {
+				return false;
+			}
+		};
+
+		const revealRewards = () => {
+			for (const el of rewards) (el as HTMLElement).hidden = false;
+		};
+
+		const unlock = () => {
+			try {
+				localStorage.setItem(UNLOCK_KEY, '1');
+			} catch {
+				/* 隐私模式：忽略 */
+			}
+			revealRewards();
+		};
+
+		const reset = () => {
+			count = 0;
+			for (const word of words) word.removeAttribute('data-egg-step');
+		};
+
+		const scheduleReset = () => {
+			window.clearTimeout(stepTimer);
+			stepTimer = window.setTimeout(reset, RAPID_MS);
+		};
+
+		const close = () => {
+			egg.hidden = true;
+			egg.classList.remove('is-logo', 'is-art');
+			playing = false;
+			document.body.style.overflow = '';
+			reset();
+		};
+
+		const play = (x: number, y: number) => {
+			playing = true;
+			egg.hidden = false;
+			document.body.style.overflow = 'hidden';
+
+			// 图标从点击处飞到屏幕中心，因此先算相对中心的偏移
+			egg.style.setProperty('--egg-dx', `${Math.round(x - window.innerWidth / 2)}px`);
+			egg.style.setProperty('--egg-dy', `${Math.round(y - window.innerHeight / 2)}px`);
+			egg.classList.add('is-logo');
+
+			if (!readUnlocked()) unlock();
+
+			// 系统开了"减少动态效果"就直接出图，不播入场
+			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+				egg.classList.add('is-art');
+				return;
+			}
+			window.setTimeout(() => egg.classList.add('is-art'), 1150);
+		};
+
+		/* 关于页：快速连点五次 */
+		for (const word of words) {
+			word.addEventListener('click', (event) => {
+				if (playing) return;
+				count += 1;
+				for (const other of words) other.setAttribute('data-egg-step', String(count));
+				scheduleReset();
+
+				if (count >= NEEDED) {
+					const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+					play(rect.left + rect.width / 2, rect.top + rect.height / 2);
+				}
+			});
+		}
+
+		/* 工具页：解锁后的卡片直接打开 */
+		for (const opener of openers) {
+			opener.addEventListener('click', (event) => {
+				event.preventDefault();
+				if (playing) return;
+				const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+				play(rect.left + rect.width / 2, rect.top + rect.height / 2);
+			});
+		}
+
+		egg.addEventListener('click', close);
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape' && !egg.hidden) close();
+		});
+
+		/* 「随机一张表情包」：id 已在构建期验证过，不做随机生成 */
+		randomLink?.addEventListener('click', () => {
+			if (!MEME_IDS.length) return;
+			const id = MEME_IDS[Math.floor(Math.random() * MEME_IDS.length)];
+			randomLink.setAttribute('href', `https://aigengtu.com/zh/meme/${id}`);
+		});
+
+		/* 图片缺失时给出提示，而不是留一片空白 */
+		art?.addEventListener('error', () => art.classList.add('is-missing'));
+
+		/* 之前解锁过就直接把奖励露出来 */
+		if (readUnlocked()) revealRewards();
+	}
+</script>
+
+<style>
+	.ds-egg {
+		position: fixed;
+		inset: 0;
+		z-index: 120;
+		background: rgba(6, 8, 14, 0.72);
+		-webkit-backdrop-filter: blur(10px);
+		backdrop-filter: blur(10px);
+		cursor: pointer;
+	}
+
+	.ds-egg[hidden] {
+		display: none;
+	}
+
+	/*
+	 * 用 transform 做位移而不是 left/top：
+	 * 起点是点击处相对屏幕中心的偏移（--egg-dx/--egg-dy），终点归零即居中。
+	 */
+	.ds-egg__logo {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		width: 92px;
+		height: 63px;
+		margin: -32px 0 0 -46px;
+		color: #4d6bfe;
+		opacity: 0;
+		transform: translate(var(--egg-dx, 0px), var(--egg-dy, 0px)) scale(0.34);
+		transition:
+			transform 720ms cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 300ms ease;
+	}
+
+	.ds-egg.is-logo .ds-egg__logo {
+		opacity: 1;
+		transform: translate(0, 0) scale(1.55);
+	}
+
+	.ds-egg.is-art .ds-egg__logo {
+		opacity: 0;
+		transform: translate(0, 0) scale(2);
+		transition:
+			transform 420ms ease,
+			opacity 380ms ease;
+	}
+
+	.ds-egg__frame {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.7rem;
+		opacity: 0;
+		transform: translate(-50%, -50%) scale(0.7);
+		transition:
+			transform 520ms cubic-bezier(0.18, 1.24, 0.4, 1),
+			opacity 320ms ease;
+	}
+
+	.ds-egg.is-art .ds-egg__frame {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1);
+	}
+
+	.ds-egg__art {
+		max-width: min(88vw, 940px);
+		max-height: 74vh;
+		border-radius: 16px;
+		box-shadow: 0 32px 90px rgba(0, 0, 0, 0.6);
+	}
+
+	/* 图片没放或取不到时的样子：至少让人知道该放哪 */
+	.ds-egg__art.is-missing {
+		width: min(80vw, 520px);
+		height: auto;
+		aspect-ratio: 4 / 5;
+		padding: 2rem;
+		background: var(--surface-2);
+		color: var(--text-secondary);
+		font-size: 0.86rem;
+	}
+
+	.ds-egg__meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: center;
+		gap: 0.35rem 0.9rem;
+		font-size: 0.76rem;
+		color: rgba(255, 255, 255, 0.62);
+		cursor: default;
+	}
+
+	.ds-egg__meta a {
+		color: #a9baff;
+		text-decoration: none;
+		border-bottom: 1px solid rgba(169, 186, 255, 0.35);
+	}
+
+	.ds-egg__meta a:hover {
+		color: #c9d4ff;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.ds-egg__logo,
+		.ds-egg__frame {
+			transition: none;
+		}
+	}
+</style>

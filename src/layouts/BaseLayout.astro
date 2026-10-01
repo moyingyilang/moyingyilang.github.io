@@ -7,6 +7,7 @@ import Toc from '../components/Toc.astro';
 import SearchPalette from '../components/SearchPalette.astro';
 import SiteScripts from '../components/SiteScripts.astro';
 import Wallpaper from '../components/Wallpaper.astro';
+import WhaleEgg from '../components/WhaleEgg.astro';
 
 interface Heading {
 	depth: number;
@@ -71,6 +72,7 @@ const tocItems = (headings || []).filter((heading) => heading.depth === 2 || hea
 		<div class="scrim" id="scrim"></div>
 		<SearchPalette />
 		<Wallpaper />
+		<WhaleEgg />
 		<SiteScripts />
 	</body>
 </html>
