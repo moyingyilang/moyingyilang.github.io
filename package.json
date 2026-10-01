@@ -26,5 +26,6 @@
       "esbuild",
       "sharp"
     ]
-  }
+  },
+  "packageManager": "pnpm@12.4.0"
 }
