@@ -6,6 +6,17 @@ export function postDate(post) {
 	return post.data.date || post.data.pubDate || null;
 }
 
+/**
+ * 当前已有文章覆盖到的分类 path 集合。
+ *
+ * 侧边栏与分类页路由都用它跳过「还没有文章」的分类，
+ * 避免访客点进一堆空页面、也避免空页面进站点地图。
+ */
+export async function usedCategories() {
+	const posts = await getCollection('blog', ({ data }) => !data.draft);
+	return new Set(posts.map((post) => post.data.category).filter(Boolean) as string[]);
+}
+
 /** 按日期倒序的全部文章（过滤草稿） */
 export async function getSortedPosts() {
 	const posts = await getCollection('blog', ({ data }) => !data.draft);

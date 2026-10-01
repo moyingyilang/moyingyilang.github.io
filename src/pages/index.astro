@@ -1,25 +1,30 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
-import { MENU_DATA, flattenMenu } from '../config/menu.js';
 import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../utils/posts';
+import { visibleMenu, visibleMenuNodes } from '../utils/nav';
 
 const posts = await getSortedPosts();
 const latest = posts.slice(0, 4);
-const menuNodes = flattenMenu();
+// 用裁剪后的可见菜单，避免首页链到没有内容的空分类
+const sections = await visibleMenu();
+const menuNodes = await visibleMenuNodes();
 const tagCount = new Set(posts.flatMap((post) => post.data.tags ?? [])).size;
 
 const SECTION_DESC: Record<string, string> = {
-	tech: '物理、化学与实验类笔记',
-	code: '容器、开发语言与开发环境',
-	notes: '项目进度、攻略、PCB 与刷机',
+	ee: '电路、PCB、电机与嵌入式',
+	cs: '语言、环境、容器与网络',
+	mech: '机械设计、材料工艺与数控',
+	basics: '物理、化学与数学',
+	data: '元件参数、公式常数、标准规范',
+	notes: '项目记录、经验与杂谈',
 	tools: '自用的小工具集合',
 	faq: '常见问题与排查记录',
 	about: '关于本站与联系方式',
 };
 
 /** 「开始阅读」指向导航里的第一个分类，避免把栏目名写死在首页 */
-const firstSection = MENU_DATA[0];
+const firstSection = sections[0];
 ---
 
 <BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION} bare>
@@ -59,7 +64,7 @@ const firstSection = MENU_DATA[0];
 		<h2 class="section-heading">浏览方向</h2>
 		<div class="grid grid--auto">
 			{
-				MENU_DATA.map((item, index) => (
+				sections.map((item, index) => (
 					<a
 						class="card reveal"
 						href={`/${item.path}`}

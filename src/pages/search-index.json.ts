@@ -1,16 +1,18 @@
 import type { APIRoute } from 'astro';
-import { flattenMenu } from '../config/menu.js';
 import { categoryOf, getSortedPosts } from '../utils/posts';
+import { visibleMenuNodes } from '../utils/nav';
 
 /**
  * 搜索索引：只在用户第一次打开命令面板时被懒加载，
  * 因此不需要内联进每个页面。
+ *
+ * 用可见菜单（已裁掉空分类），否则搜索结果会链到不存在的页面。
  */
 export const GET: APIRoute = async () => {
 	const posts = await getSortedPosts();
 
 	const items = [
-		...flattenMenu().map((node) => ({
+		...(await visibleMenuNodes()).map((node) => ({
 			title: node.label,
 			url: node.href,
 			kind: node.depth === 0 ? '板块' : '分类',

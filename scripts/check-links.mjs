@@ -39,26 +39,43 @@ const REQUIRED_STATIC = [
 	'blog/index.html',
 ];
 
-/** 从 menu.js 推导分类页路由；dedicated 节点有独立页面，不走兜底路由 */
-async function requiredFromMenu() {
+/**
+ * 读取内容目录：文章文件名，以及它们用到的 category。
+ *
+ * 分类页现在只为「已经有文章」的分类生成，所以校验也必须据此推导，
+ * 否则会误报缺页。
+ */
+function readContent() {
+	const dir = resolve(import.meta.dirname, '..', 'src', 'content', 'blog');
+	let files = [];
 	try {
-		const mod = await import('../src/config/menu.js');
-		const paths = mod.categoryPaths();
-		return paths.map((p) => `${p}/index.html`);
-	} catch (error) {
-		console.warn(`  注意：无法从 menu.js 推导路由（${error.message}），跳过该项`);
-		return [];
+		files = readdirSync(dir).filter((f) => /\.mdx?$/.test(f));
+	} catch {
+		return { files: [], used: new Set() };
 	}
+
+	const used = new Set();
+	for (const file of files) {
+		const src = readFileSync(join(dir, file), 'utf8');
+		const frontmatter = src.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+		if (!frontmatter) continue;
+		const category = frontmatter[1].match(/^category:\s*['"]?([\w-]+)['"]?\s*$/m);
+		if (category) used.add(category[1]);
+	}
+	return { files, used };
 }
 
-/** 从内容目录推导文章页路由 */
-function requiredFromContent() {
+/** 从 menu.js 推导「应该存在」的分类页路由（与构建时的裁剪规则一致） */
+async function requiredFromMenu(used) {
 	try {
-		const dir = resolve(import.meta.dirname, '..', 'src', 'content', 'blog');
-		return readdirSync(dir)
-			.filter((f) => /\.mdx?$/.test(f))
-			.map((f) => `blog/${f.replace(/\.mdx?$/, '')}/index.html`);
-	} catch {
+		const mod = await import('../src/config/menu.js');
+		const pruned = mod.pruneEmpty(mod.MENU_DATA, used);
+		return mod
+			.flattenMenu(pruned)
+			.filter((node) => !node.dedicated)
+			.map((node) => `${node.href.replace(/^\//, '')}/index.html`);
+	} catch (error) {
+		console.warn(`  注意：无法从 menu.js 推导路由（${error.message}），跳过该项`);
 		return [];
 	}
 }
@@ -66,11 +83,13 @@ function requiredFromContent() {
 /** 独立页面（与 menu 里的 dedicated 节点对应） */
 const REQUIRED_PAGES = ['about/index.html', 'faq/index.html', 'tools/index.html'];
 
+const { files: contentFiles, used: usedCategories } = readContent();
+
 const REQUIRED = [
 	...REQUIRED_STATIC,
 	...REQUIRED_PAGES,
-	...(await requiredFromMenu()),
-	...requiredFromContent(),
+	...(await requiredFromMenu(usedCategories)),
+	...contentFiles.map((f) => `blog/${f.replace(/\.mdx?$/, '')}/index.html`),
 ];
 
 if (!existsSync(DIST)) {
@@ -149,7 +168,18 @@ try {
 		console.error('✗ search-index.json 为空');
 		failures += 1;
 	} else {
-		console.log(`✓ 搜索索引 ${index.length} 条`);
+		// 索引里的 URL 也必须能解析 —— 否则搜索结果会点出 404，
+		// 而这类死链藏在 JSON 里，HTML 扫描是发现不了的
+		const dead = index.filter((item) => item?.url && !resolves(item.url));
+		if (dead.length) {
+			console.error(`✗ 搜索索引里有 ${dead.length} 条失效 URL:`);
+			for (const item of dead.slice(0, 8)) {
+				console.error(`    - ${item.url}  (${item.title})`);
+			}
+			failures += dead.length;
+		} else {
+			console.log(`✓ 搜索索引 ${index.length} 条，URL 全部可解析`);
+		}
 	}
 } catch (error) {
 	console.error(`✗ search-index.json 无法解析: ${error.message}`);

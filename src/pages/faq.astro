@@ -9,7 +9,15 @@ const FAQS = [
 	},
 	{
 		q: 'category 应该填什么？',
-		a: '填左侧导航里叶子节点的 <code>path</code> 片段，例如 <code>physics-e</code>、<code>container</code>、<code>game-guides</code>。分类页会用这个值来筛选文章，填错则只会出现在文章列表里。',
+		a: '填 <code>src/config/menu.js</code> 里叶子节点的 <code>path</code> 片段，例如 <code>circuits</code>（电气工程 · 电路原理）、<code>ops</code>（计算机 · 容器与运维）、<code>components</code>（数据速查 · 元件参数）、<code>misc</code>（随笔 · 杂谈）。分类页会用这个值筛选文章。',
+	},
+	{
+		q: '为什么导航里看不到「电气工程」「计算机」「机械制造」这些分类？',
+		a: '分类体系已经在 <code>src/config/menu.js</code> 里一次定义好了，但<strong>只显示已经有文章的分类</strong>——访客不会点进空页面，也不会因为「还有一堆栏目要填」而不敢动笔。写一篇文章并把 <code>category</code> 填成对应分类，下次构建它就会自动出现在导航里。<br />想改成「所有分类始终显示」，把 <code>menu.js</code> 里的 <code>HIDE_EMPTY_CATEGORIES</code> 设为 <code>false</code> 即可。',
+	},
+	{
+		q: '不擅长写文章，只想把数据和参数记下来可以吗？',
+		a: '可以，而且推荐这样做。参数、规格、测量值这类内容适合用「小标题 + 表格 + 一行测量条件」的形式，不需要写引言和总结：<br />先只把表填满，这一条就已经有用了。<br />完整示例见 <a href="/blog/style-guide/">样式与写作参考</a>。',
 	},
 	{
 		q: '上下篇是怎么来的？',

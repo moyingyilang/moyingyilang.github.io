@@ -12,9 +12,12 @@
  */
 
 const ICONS = {
-	tech:
+	ee: '<path d="M13 2.5 5 13.2h5.6L10 21.5l8-10.9h-5.6z"/>',
+	cs: '<path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/>',
+	mech: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3.5v5.1M12 15.4v5.1M3.5 12h5.1M15.4 12h5.1"/>',
+	basics:
 		'<path d="M9.5 3h5"/><path d="M10.5 3v6.1L5.9 17.4A2.6 2.6 0 0 0 8.2 21.4h7.6a2.6 2.6 0 0 0 2.3-4L13.5 9.1V3"/><path d="M7.4 15h9.2"/>',
-	code: '<path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/>',
+	data: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M9.5 9.5v10"/>',
 	notes:
 		'<rect x="4.5" y="3" width="15" height="18" rx="2.5"/><path d="M8.5 8h7"/><path d="M8.5 12h7"/><path d="M8.5 16h4"/>',
 	tools:
@@ -24,45 +27,113 @@ const ICONS = {
 		'<circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>',
 };
 
+/**
+ * 是否在侧边栏隐藏「还没有文章」的分类。
+ *
+ * 分类可以先按完整体系定义好，等真正写了文章它才出现在导航里 ——
+ * 访客看不到空栏目，你也不会因为「还有一堆栏目要填」而不敢动笔。
+ * 改成 false 就恢复成「所有分类始终显示」。
+ */
+export const HIDE_EMPTY_CATEGORIES = true;
+
 export const MENU_DATA = [
 	{
-		label: '科创',
-		path: 'tech',
-		icon: ICONS.tech,
+		label: '电气工程',
+		path: 'ee',
+		icon: ICONS.ee,
 		children: [
-			{ label: '物理-电', path: 'physics-e' },
-			{ label: '物理-力', path: 'physics-f' },
-			{ label: '化学', path: 'chemistry' },
-			{ label: '技巧/小知识', path: 'tips' },
+			{ label: '电路原理', path: 'circuits' },
+			{ label: 'PCB 设计', path: 'pcb' },
+			{ label: '电机与拖动', path: 'motors' },
+			{ label: '嵌入式与单片机', path: 'embedded' },
+			{ label: '仪器与测量', path: 'measure' },
 		],
 	},
 	{
-		label: '代码',
-		path: 'code',
-		icon: ICONS.code,
+		label: '计算机',
+		path: 'cs',
+		icon: ICONS.cs,
 		children: [
-			{ label: '容器', path: 'container' },
-			{ label: '开发语言', path: 'language' },
+			{ label: '开发语言', path: 'languages' },
 			{ label: '开发环境', path: 'env' },
+			{ label: '容器与运维', path: 'ops' },
+			{ label: '网络与协议', path: 'network' },
 		],
 	},
 	{
-		label: '小知识/随笔',
+		label: '机械制造',
+		path: 'mech',
+		icon: ICONS.mech,
+		children: [
+			{ label: '机械设计', path: 'design' },
+			{ label: '材料与工艺', path: 'materials' },
+			{ label: '公差与测量', path: 'tolerance' },
+			{ label: '数控与 3D 打印', path: 'cnc' },
+		],
+	},
+	{
+		label: '基础学科',
+		path: 'basics',
+		icon: ICONS.basics,
+		children: [
+			{ label: '物理', path: 'physics' },
+			{ label: '化学', path: 'chemistry' },
+			{ label: '数学', path: 'math' },
+		],
+	},
+	{
+		// 给「记得住数据、不想写散文」的内容准备的格式：以表格与参数为主
+		label: '数据速查',
+		path: 'data',
+		icon: ICONS.data,
+		children: [
+			{ label: '元件参数', path: 'components' },
+			{ label: '公式与常数', path: 'formulas' },
+			{ label: '标准与规范', path: 'standards' },
+		],
+	},
+	{
+		label: '随笔',
 		path: 'notes',
 		icon: ICONS.notes,
 		children: [
-			{ label: '开发者目前研究项目', path: 'dev-projects' },
-			{ label: '项目往事及进度', path: 'project-history' },
-			{ label: '部分游戏总结的攻略', path: 'game-guides' },
-			{ label: 'pcb设计和电路原理等', path: 'pcb' },
-			{ label: '刷机圈小瓜', path: 'flash-gossip' },
-			{ label: 'git项目监控引擎', path: 'git-monitor' },
+			{ label: '项目记录', path: 'projects' },
+			{ label: '经验与教训', path: 'lessons' },
+			{ label: '杂谈', path: 'misc' },
 		],
 	},
-	{ label: '杂项工具', path: 'tools', icon: ICONS.tools, dedicated: true },
+	{ label: '工具', path: 'tools', icon: ICONS.tools, dedicated: true },
 	{ label: '常见问题', path: 'faq', icon: ICONS.faq, dedicated: true },
 	{ label: '关于', path: 'about', icon: ICONS.about, dedicated: true },
 ];
+
+/**
+ * 过滤掉还没有文章的分类。
+ *
+ * 规则：
+ * - 独立页面（dedicated）始终保留
+ * - 叶子节点：只有出现在 `used` 里才保留
+ * - 分组节点：自身有文章，或过滤后还有子节点，才保留
+ *
+ * 这样分类体系可以一次定义完整，但只有真正写了文章的分类才会露出来。
+ */
+export function pruneEmpty(items, used) {
+	const out = [];
+	for (const item of items) {
+		if (item.dedicated) {
+			out.push(item);
+			continue;
+		}
+
+		const keptChildren = item.children?.length ? pruneEmpty(item.children, used) : [];
+
+		// 分组页本身也能挂文章（category 填分组自己的 path）
+		if (keptChildren.length || used.has(item.path)) {
+			out.push(keptChildren.length ? { ...item, children: keptChildren } : { ...item, children: undefined });
+		}
+	}
+	return out;
+}
 
 /** 规整 URL：去掉末尾斜杠（根路径除外） */
 export function normalizePath(pathname = '/') {

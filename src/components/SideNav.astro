@@ -1,14 +1,18 @@
 ---
-import { MENU_DATA, findMenuTrail, normalizePath } from '../config/menu.js';
+import { HIDE_EMPTY_CATEGORIES, MENU_DATA, findMenuTrail, normalizePath, pruneEmpty } from '../config/menu.js';
+import { usedCategories } from '../utils/posts';
 import NavTree from './NavTree.astro';
 
 const pathname = normalizePath(Astro.url.pathname);
 const trailHrefs = findMenuTrail(pathname).map((node) => node.href);
+
+// 分类体系可以一次定义完整，但只把已经写了文章的分类露出来
+const items = HIDE_EMPTY_CATEGORIES ? pruneEmpty(MENU_DATA, await usedCategories()) : MENU_DATA;
 ---
 
 <aside class="sidenav glass" id="sidenav" aria-label="站点导航">
 	<p class="sidenav__title">文档导航</p>
-	<NavTree items={MENU_DATA} trailHrefs={trailHrefs} />
+	<NavTree items={items} trailHrefs={trailHrefs} />
 
 	<div class="sidenav__foot">
 		<a href="/blog" class="sidenav__foot-link">文章列表</a>

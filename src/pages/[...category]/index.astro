@@ -1,22 +1,52 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { categoryPaths, findMenuTrail, flattenMenu, normalizePath } from '../../config/menu.js';
-import { categoryOf, formatDate, getSortedPosts, postHref, readingTime } from '../../utils/posts';
+import {
+	HIDE_EMPTY_CATEGORIES,
+	MENU_DATA,
+	categoryPaths,
+	findMenuTrail,
+	flattenMenu,
+	normalizePath,
+	pruneEmpty,
+} from '../../config/menu.js';
+import {
+	categoryOf,
+	formatDate,
+	getSortedPosts,
+	postHref,
+	readingTime,
+	usedCategories,
+} from '../../utils/posts';
+import { visibleMenuNodes } from '../../utils/nav';
 
 export const prerender = true;
 
 /**
- * 只为本就存在独立页面的节点之外的分类生成路由。
- * 菜单里的 dedicated 节点（tools / faq / about）有自己的 .astro，
- * 若一并生成会产出同一 URL 并在构建时冲突。
+ * 生成分类页路由。
+ *
+ * 两种情况必须排除：
+ * 1. dedicated 节点（tools / faq / about）有自己的 .astro，
+ *    一并生成会产出同一 URL 并在构建时冲突；
+ * 2. 还没有文章的分类 —— 空页面既没有浏览价值，也会污染站点地图。
+ *    写了文章后下次构建会自动出现。
  */
 export async function getStaticPaths() {
-	return categoryPaths().map((category) => ({ params: { category } }));
+	if (!HIDE_EMPTY_CATEGORIES) {
+		return categoryPaths().map((category) => ({ params: { category } }));
+	}
+
+	const pruned = pruneEmpty(MENU_DATA, await usedCategories());
+	const paths = flattenMenu(pruned)
+		.filter((node) => !node.dedicated)
+		.map((node) => node.href.replace(/^\//, ''));
+
+	return paths.map((category) => ({ params: { category } }));
 }
 
 const pathname = normalizePath(Astro.url.pathname);
 const trail = findMenuTrail(pathname);
-const nodes = flattenMenu();
+// 用裁剪后的可见菜单：否则会列出没有任何文章的子分类，链到不存在的页面
+const nodes = await visibleMenuNodes();
 const self = nodes.find((node) => node.href === pathname) ?? null;
 
 const children = self
