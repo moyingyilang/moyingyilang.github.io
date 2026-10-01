@@ -43,6 +43,7 @@ export const MENU_DATA = [
 		icon: ICONS.ee,
 		children: [
 			{ label: '电路原理', path: 'circuits' },
+			{ label: '电源设计', path: 'power' },
 			{ label: 'PCB 设计', path: 'pcb' },
 			{ label: '电机与拖动', path: 'motors' },
 			{ label: '嵌入式与单片机', path: 'embedded' },
