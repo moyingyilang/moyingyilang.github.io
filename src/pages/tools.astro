@@ -1,7 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-const TOOLS = [
+/** 站内提供的入口 */
+const SITE_TOOLS = [
 	{
 		title: '站内搜索',
 		desc: '按标题、描述与分类检索全站内容，支持键盘操作。',
@@ -23,14 +24,252 @@ const TOOLS = [
 	},
 	{
 		title: '文章归档',
-		desc: '按时间倒序浏览全部文章，带分类与阅读时长标注。',
+		desc: '按分类归集浏览全部文章，带标签与阅读时长标注。',
 		href: '/blog',
 		badge: '列表',
 	},
 ];
+
+/**
+ * 自用软件清单。
+ *
+ * 收录标准：能给出**可验证的获取地址**（官网 / GitHub / F-Droid / 商店），
+ * 且确实长期在用。只罗列包名对读者没有意义，所以一律给出处。
+ */
+const APP_GROUPS = [
+	{
+		label: '终端与逆向',
+		items: [
+			{
+				title: 'Termux',
+				desc: '无需 root 的终端环境，可直接在手机上跑 Python、GCC、git、radare2。本站在手机上做的逆向分析都在它里面完成。',
+				href: 'https://github.com/termux/termux-app',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Termux:API',
+				desc: '让 Termux 脚本调用手机硬件：剪贴板、短信、传感器、GPS、通知。写自动化脚本时的必备扩展。',
+				href: 'https://github.com/termux/termux-api',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Termux:Boot',
+				desc: '开机自动执行 Termux 脚本。需要长期驻留的自动化任务靠它拉起。',
+				href: 'https://github.com/termux/termux-boot',
+				badge: 'GitHub',
+			},
+			{
+				title: 'MT 管理器',
+				desc: 'APK 编辑、DEX 反编译、资源替换、文本十六进制编辑。国内 Android 折腾的常用工具，另有 MT 终端扩展包。',
+				href: 'https://mt2.cn/',
+				badge: '官网',
+			},
+			{
+				title: 'Apktool M',
+				desc: '界面化的 APK 反编译与重打包，比命令行 apktool 省事，适合快速改包验证。',
+				href: 'https://maximoff.su/apktool/',
+				badge: '官网',
+			},
+			{
+				title: 'HttpCanary',
+				desc: 'HTTP／HTTPS 抓包工具，配合证书可看明文请求。⚠️ 官方自 2021 年起停止维护，新系统上可能无法正常工作。',
+				href: 'https://github.com/MegatronKing/HttpCanary',
+				badge: 'GitHub',
+			},
+		],
+	},
+	{
+		label: 'Root 与系统工具',
+		items: [
+			{
+				title: 'KernelSU',
+				desc: '基于内核的 root 方案，权限管理在内核态完成，比传统方案更难被应用探测到。',
+				href: 'https://github.com/tiann/KernelSU',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Shizuku',
+				desc: '免 root 提权：通过 ADB 授权，让普通应用也能调用系统级 API。很多现代工具依赖它。',
+				href: 'https://github.com/RikkaApps/Shizuku',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Scene',
+				desc: '性能调度、温控与功耗监控。可以查看频率曲线、调整调度策略。',
+				href: 'https://github.com/helloklf/vtools',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Hail',
+				desc: '冻结／解冻应用，替代「冰箱」类工具。冻结后应用不占内存也不后台跑。',
+				href: 'https://github.com/aistra0528/Hail',
+				badge: 'GitHub',
+			},
+			{
+				title: 'DataBackup',
+				desc: '应用数据备份与恢复，支持 root 方式完整备份，换机时很有用。',
+				href: 'https://github.com/XayahSuSuSu/Android-DataBackup',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Disky',
+				desc: '磁盘占用分析，按目录逐层展开找出最占空间的「小偷」。',
+				href: 'https://f-droid.org/packages/de.felixnuesse.disky/',
+				badge: 'F-Droid',
+			},
+			{
+				title: 'DriveDroid',
+				desc: '把手机当 U 盘或启动盘用，可挂载 ISO 给电脑启动系统。',
+				href: 'https://softwarebakery.com/projects/drivedroid',
+				badge: '官网',
+			},
+			{
+				title: 'FuseFixer',
+				desc: '修复 Android 11 以后 FUSE 存储重定向带来的权限问题，逆向取文件时常需要。',
+				href: 'https://github.com/5ec1cff/FuseFixer',
+				badge: 'GitHub',
+			},
+			{
+				title: 'I-Am-Pad',
+				desc: '让应用以为设备是大屏平板，用来开启应用的平板模式。',
+				href: 'https://github.com/Houvven/I-Am-Pad',
+				badge: 'GitHub',
+			},
+			{
+				title: 'HideRecent',
+				desc: '把指定应用从最近任务列表里隐藏掉。',
+				href: 'https://github.com/Xposed-Modules-Repo/moe.lyniko.hiderecent',
+				badge: 'GitHub',
+			},
+		],
+	},
+	{
+		label: '模块与检测',
+		items: [
+			{
+				title: 'HyperCeiler',
+				desc: '澎湃 OS／MIUI 的功能增强模块，解锁隐藏设置、调整系统行为。',
+				href: 'https://github.com/ReChronoRain/HyperCeiler',
+				badge: 'GitHub',
+			},
+			{
+				title: 'QAuxiliary',
+				desc: 'QQ 功能增强模块，去掉广告、解除部分限制、补充实用功能。',
+				href: 'https://github.com/cinit/QAuxiliary',
+				badge: 'GitHub',
+			},
+			{
+				title: 'TCQT',
+				desc: '另一个 QQ 增强模块，侧重消息与界面定制。',
+				href: 'https://github.com/Xposed-Modules-Repo/com.owo233.tcqt',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Hide My Applist',
+				desc: '向指定应用隐藏已安装应用列表，避免被「读了应用列表」来判断设备环境。这里用的是 HMA-OSS 分支。',
+				href: 'https://github.com/frknkrc44/HMA-OSS',
+				badge: 'GitHub',
+			},
+			{
+				title: 'MagiskDetector',
+				desc: '检测设备是否被 root／改机，用来验证自己的隐藏手段是否真的生效。',
+				href: 'https://github.com/vvb2060/MagiskDetector',
+				badge: 'GitHub',
+			},
+			{
+				title: 'KeyAttestation',
+				desc: '检测密钥认证链路与 root 痕迹，比单纯查文件更深入。',
+				href: 'https://github.com/vvb2060/KeyAttestation',
+				badge: 'GitHub',
+			},
+		],
+	},
+	{
+		label: '日常与娱乐',
+		items: [
+			{
+				title: 'Via',
+				desc: '体积只有几百 KB 的浏览器，可自定义拦截规则，启动快。',
+				href: 'https://viayoo.com/',
+				badge: '官网',
+			},
+			{
+				title: 'Firefox',
+				desc: '开源浏览器，支持扩展，隐私控制比多数国产浏览器清楚。',
+				href: 'https://www.mozilla.org/firefox/',
+				badge: '官网',
+			},
+			{
+				title: '洛雪音乐',
+				desc: '开源音乐播放器，支持自定义音源与本地音乐管理。',
+				href: 'https://github.com/lyswhut/lx-music-mobile',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Ncrust',
+				desc: '第三方网易云客户端，原生性能取向，界面比官方客户端轻。',
+				href: 'https://github.com/yaxiaiyuting/Ncrust',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Fold Craft Launcher',
+				desc: '在安卓手机上运行 Minecraft Java 版，支持装模组与整合包。',
+				href: 'https://github.com/FCL-Team/FoldCraftLauncher',
+				badge: 'GitHub',
+			},
+			{
+				title: 'Materializr',
+				desc: '开源参数化 3D CAD：约束草图、实体建模、螺纹、STL／STEP 导出，手机上就能画零件。',
+				href: 'https://github.com/materializr-cad/materializr',
+				badge: 'GitHub',
+			},
+			{
+				title: '自动点击器',
+				desc: '连点与手势录制，做重复操作时省事。',
+				href: 'https://app.mi.com/details?id=com.zidongdianji',
+				badge: '小米商店',
+			},
+			{
+				title: '123 云盘',
+				desc: '免费 2T 空间的网盘，上传下载速度尚可，用作资料中转。',
+				href: 'https://www.123pan.com/',
+				badge: '官网',
+			},
+			{
+				title: 'Telegram',
+				desc: '即时通讯，频道与机器人生态完善，常用来订阅技术资讯。',
+				href: 'https://telegram.org/',
+				badge: '官网',
+			},
+			{
+				title: '酷安',
+				desc: '国内少见的应用与搞机社区，冷门工具和折腾经验大多在这里流通。',
+				href: 'https://www.coolapk.com/',
+				badge: '官网',
+			},
+			{
+				title: 'TapTap',
+				desc: '游戏社区与分发平台，看评分和玩家评价比较直接。',
+				href: 'https://www.taptap.cn/',
+				badge: '官网',
+			},
+			{
+				title: 'DeepSeek',
+				desc: '常用的大模型助手，本站的 AI 协作也用的这一家的模型。',
+				href: 'https://www.deepseek.com/',
+				badge: '官网',
+			},
+		],
+	},
+];
+
+const total = APP_GROUPS.reduce((sum, group) => sum + group.items.length, 0);
 ---
 
-<BaseLayout title="杂项工具" description="本站提供的检索、订阅与索引等实用入口。">
+<BaseLayout
+	title="杂项工具"
+	description="本站的检索、订阅与索引入口，以及长期在用的 Android 工具与应用清单。"
+>
 	<nav class="breadcrumbs" aria-label="面包屑">
 		<a href="/">首页</a>
 		<span class="sep" aria-hidden="true">/</span>
@@ -40,33 +279,68 @@ const TOOLS = [
 	<div class="page-head">
 		<span class="page-head__eyebrow badge">独立页面</span>
 		<h1 class="page-title">杂项工具</h1>
-		<p class="page-desc">本站已经可用的检索、订阅与索引入口，后续会继续补充自用的小工具。</p>
+		<p class="page-desc">
+			本站可用的检索、订阅与索引入口，以及长期在用的软件清单（{total} 项，均给出可获取的出处）。
+		</p>
 	</div>
 
-	<div class="grid grid--2">
+	<section class="tool-section">
+		<h2 class="section-heading">站内入口</h2>
+		<div class="grid grid--2">
+			{
+				SITE_TOOLS.map((tool, index) => (
+					<a
+						class="card reveal"
+						href={tool.href}
+						data-tool={tool.action ?? undefined}
+						style={`transition-delay:${Math.min(index * 45, 220)}ms`}
+					>
+						<span class="card__arrow">→</span>
+						<div class="tool__head">
+							<h3 class="card__title">{tool.title}</h3>
+							<span class="badge badge--muted">{tool.badge}</span>
+						</div>
+						<p class="card__desc">{tool.desc}</p>
+					</a>
+				))
+			}
+		</div>
+	</section>
+
+	<section class="tool-section">
+		<h2 class="section-heading">常用软件</h2>
+		<p class="tool-note">
+			全部为自用，按用途分组。点进去都是官方仓库或官网，不经过第三方下载站。
+		</p>
+
 		{
-			TOOLS.map((tool, index) => (
-				<a
-					class="card reveal"
-					href={tool.href}
-					data-tool={tool.action ?? undefined}
-					style={`transition-delay:${Math.min(index * 45, 220)}ms`}
-				>
-					<span class="card__arrow">→</span>
-					<div class="tool__head">
-						<h2 class="card__title">{tool.title}</h2>
-						<span class="badge badge--muted">{tool.badge}</span>
+			APP_GROUPS.map((group) => (
+				<div class="tool-group">
+					<h3 class="tool-group__head glass">
+						{group.label}
+						<span class="tool-group__count">{group.items.length}</span>
+					</h3>
+					<div class="grid grid--auto">
+						{group.items.map((item) => (
+							<a
+								class="card reveal"
+								href={item.href}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<span class="card__arrow">↗</span>
+								<div class="tool__head">
+									<h4 class="card__title">{item.title}</h4>
+									<span class="badge badge--muted">{item.badge}</span>
+								</div>
+								<p class="card__desc">{item.desc}</p>
+							</a>
+						))}
 					</div>
-					<p class="card__desc">{tool.desc}</p>
-				</a>
+				</div>
 			))
 		}
-	</div>
-
-	<div class="empty-state reveal">
-		<p class="empty-state__icon" aria-hidden="true">🧰</p>
-		<p>更多工具正在整理中。</p>
-	</div>
+	</section>
 </BaseLayout>
 
 <script>
@@ -78,6 +352,49 @@ const TOOLS = [
 </script>
 
 <style>
+	.tool-section {
+		display: flex;
+		flex-direction: column;
+		gap: 1.1rem;
+	}
+
+	.tool-note {
+		margin: -0.4rem 0 0;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+	}
+
+	.tool-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.8rem;
+		margin-top: 0.6rem;
+	}
+
+	/*
+	 * 二级分组标题。
+	 * 直接压在壁纸上时对比度不足，所以复用 .glass 做成胶囊，
+	 * 兼用最深的 --text 而不是次级色。
+	 */
+	.tool-group__head {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.55rem;
+		align-self: flex-start;
+		margin: 0;
+		padding: 0.34rem 0.85rem;
+		font-size: 0.88rem;
+		font-weight: 600;
+		color: var(--text);
+		border-radius: var(--r-pill);
+	}
+
+	.tool-group__count {
+		font-size: 0.75rem;
+		font-weight: 450;
+		color: var(--text-secondary);
+	}
+
 	.tool__head {
 		display: flex;
 		align-items: center;
