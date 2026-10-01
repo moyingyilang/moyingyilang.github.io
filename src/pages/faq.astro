@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { REPO_URL } from '../consts';
 
 const FAQS = [
 	{
@@ -57,7 +58,7 @@ const FAQS = [
 		<h2 class="section-heading">还有其他问题？</h2>
 		<p class="page-desc faq-foot__desc">可以到 GitHub 提 Issue，或在关于页找到其他联系方式。</p>
 		<div class="row">
-			<a class="btn btn--accent" href="https://github.com/moyingyilang" target="_blank" rel="noopener noreferrer">
+			<a class="btn btn--accent" href={`${REPO_URL}/issues`} target="_blank" rel="noopener noreferrer">
 				GitHub Issues
 			</a>
 			<a class="btn" href="/about">关于本站</a>

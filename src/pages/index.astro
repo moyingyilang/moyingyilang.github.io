@@ -17,6 +17,9 @@ const SECTION_DESC: Record<string, string> = {
 	faq: '常见问题与排查记录',
 	about: '关于本站与联系方式',
 };
+
+/** 「开始阅读」指向导航里的第一个分类，避免把栏目名写死在首页 */
+const firstSection = MENU_DATA[0];
 ---
 
 <BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION} bare>
@@ -26,7 +29,7 @@ const SECTION_DESC: Record<string, string> = {
 		<p class="page-desc">{SITE_DESCRIPTION}</p>
 
 		<div class="row hero__actions">
-			<a class="btn btn--accent" href="/tech">
+			<a class="btn btn--accent" href={`/${firstSection.path}`}>
 				开始阅读
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="hero__cta-icon">
 					<path d="M5 12h13" /><path d="m12 6 6 6-6 6" />

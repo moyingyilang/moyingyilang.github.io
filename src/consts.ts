@@ -6,10 +6,17 @@ export const SITE_AUTHOR = '路遥起森6173';
 /** 版权年份的起始年，用于页脚显示 “2026–至今” 这类区间 */
 export const SITE_COPYRIGHT_YEAR = 2026;
 
+/**
+ * 页脚图标按钮。
+ *
+ * `icon` 是**显式**的图标 id（对应 Footer.astro 里 ICONS 的键），
+ * 不用 label 去匹配 —— 否则改个显示名就会静默掉图标。
+ * icon 找不到对应图标时，回退渲染成文字链接。
+ */
 export const SOCIAL_LINKS = [
-	{ label: 'GitHub', href: 'https://github.com/moyingyilang' },
-	{ label: 'Bilibili', href: 'https://b23.tv/u15YhSq' },
-	{ label: '酷安', href: 'https://www.coolapk.com/u/33040930' },
+	{ label: 'GitHub', href: 'https://github.com/moyingyilang', icon: 'github' },
+	{ label: '哔哩哔哩', href: 'https://b23.tv/u15YhSq', icon: 'bilibili' },
+	{ label: '酷安', href: 'https://www.coolapk.com/u/33040930', icon: 'coolapk' },
 ];
 
 export const REPO_URL = 'https://github.com/moyingyilang/moyingyilang.github.io';
