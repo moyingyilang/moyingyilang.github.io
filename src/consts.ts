@@ -9,11 +9,17 @@ export const SITE_AUTHOR = '你的名字';
 /** 版权年份的起始年，用于页脚显示 “2026–至今” 这类区间 */
 export const SITE_COPYRIGHT_YEAR = 2026;
 
-/** 页脚图标按钮；label 需与 Footer.astro 里的 ICONS 键对应，找不到图标时回退为文字 */
+/**
+ * 页脚图标按钮。
+ *
+ * `icon` 是**显式**的图标 id（对应 Footer.astro 里 ICONS 的键），
+ * 不用 label 去匹配 —— 否则改个显示名就会静默掉图标。
+ * icon 为 null 或找不到对应图标时，回退渲染成文字链接。
+ */
 export const SOCIAL_LINKS = [
-	{ label: 'GitHub', href: 'https://github.com/your-name' },
-	{ label: 'Bilibili', href: 'https://space.bilibili.com/your-uid' },
-	{ label: '酷安', href: 'https://www.coolapk.com/u/your-uid' },
+	{ label: 'GitHub', href: 'https://github.com/your-name', icon: 'github' },
+	{ label: '哔哩哔哩', href: 'https://space.bilibili.com/your-uid', icon: 'bilibili' },
+	{ label: '酷安', href: 'https://www.coolapk.com/u/your-uid', icon: 'coolapk' },
 ];
 
 /** 源码仓库地址，用于「关于」页与页脚的 ISSUE / LICENSE 链接 */
