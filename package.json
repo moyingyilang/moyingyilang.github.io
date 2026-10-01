@@ -20,5 +20,11 @@
   },
   "devDependencies": {
     "gh-pages": "^6.3.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
   }
 }
