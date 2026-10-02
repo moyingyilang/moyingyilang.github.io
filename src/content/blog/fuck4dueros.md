@@ -1,7 +1,8 @@
 ---
 title: Fuck4DuerOS 项目总结
-description: 一台百度 DuerOS 定制学生手机的完整取证与净化记录：预置 PCDN 组件与 Xray 采集 SDK、通讯劫持组件、services.jar 框架层注入与 HOME 拦截，以及用 Magisk 模块与 hosts 完成清理；附音频调度、内存诊断与 U-Boot 分析。
+description: 一台百度 DuerOS 定制学生手机的完整取证与净化记录：预置 PCDN 组件与 Xray 采集 SDK、通讯劫持组件、services.jar 框架层注入与 HOME 拦截，以及用 Magisk 模块与 hosts 完成清理；2026-10-02 补充框架层 107 个注入类与 IDuerService 提权接口，以及 libcyber-pcdn.so 的 APK 内嵌载体与模块覆盖盲区；附音频调度、内存诊断与 U-Boot 分析。
 date: 2026-10-01
+updatedDate: 2026-10-02
 category: android
 tags:
   - Android
@@ -70,18 +71,42 @@ PrismStatusReiver
 
 ### 1.3 系统框架层注入
 
-`services.jar` 中注入的百度类：
+把 `framework.jar` 与 `services.jar` 的 `classes*.dex` 用 `dexdump` 过一遍，
+筛选类名里含 `baidu` 的类，实际数量比最初记录的 8 个多得多：
 
-```text
-com.android.server.baidu.AppOpsUtils
-com.android.server.baidu.DuerSystemConfigManager
-com.android.server.baidu.DuerService（100+ 方法）
-com.android.server.baidu.DuerLocalServiceIntf
-com.baidu.am.ActivityStackMonitor（多任务拦截）
-com.baidu.am.BroadcastBlocker
-com.baidu.am.AppProcessController
-com.baidu.pm.PreloadAppController
-```
+| 组件 | 非 AOSP 类 | 方法 |
+| --- | --- | --- |
+| `/system/framework/framework.jar` | 62 | 722 |
+| `/system/framework/services.jar` | 45 | 386 |
+| **合计** | **107** | **1108** |
+
+`services.jar` 是 `system_server` 的实现，AOSP 里不该出现任何 `com.baidu.*`。
+完整类表与方法签名见项目内
+[docs/framework-hooks.md](https://github.com/moyingyilang/Fuck4DuerOS/blob/main/docs/framework-hooks.md)。
+重点几类：
+
+| 类 | 关键方法 | 含义 |
+| --- | --- | --- |
+| `com.baidu.am.ActivityStackMonitor` | `checkStartActivity`、`filterBlockedResolveInfo` | 哪个包、哪个 Activity 能启动，由百度名单决定 |
+| `com.baidu.am.ActivityRedirection` | `isSettingsAction`、`redirectToDefaultSettingAction`、`replacePendingIntent` | 重定向「设置」类 Intent；替换通知里的 PendingIntent |
+| `com.baidu.am.BroadcastBlocker` / `SyncManagerBlocker` | `shouldBlock` | 拦广播 / 拦同步 |
+| `com.baidu.am.ClearTaskController` | `isDoNotKillPackage` | 决定「一键清理」杀谁不杀谁 |
+| `com.baidu.pm.PermissionController` | `shouldNotShowConfirmationDialog`、`shouldGrantSignaturePermission`、`revokePkgFlagsIfNeeded` | 白名单内的包可以不弹确认框直接授权 |
+| `com.baidu.monitors.CameraUseStatusMonitor` / `MicUseStatusMonitor` | `getCameraUseApps` / `getMicUseApps` | 跨进程查询摄像头 / 麦克风使用者 |
+| `com.baidu.input.InputMethodMonitor` | `getCurrentInputMethod`、`onInputSettingsChanged` | 监听输入法切换 |
+| `com.baidu.notification.NotificationController` | `isAllowedToPostNotification` | 决定谁能发通知 |
+
+`framework.jar` 那边还有几个值得单独点出来：
+
+| 类 | 关键方法 | 含义 |
+| --- | --- | --- |
+| `android.os.baidu.IDuerService` | 63 个方法，含 `wipe`、`takeScreenshot`、`readWifiPassWd`、`sendUibcInputEvent`、`setRuntimePermissions` | 私有提权接口 |
+| `android.app.baidu.SharedPreferenceHack` | `onGetBoolean`、`onPutString` | 框架层拦截 SharedPreferences 读写 |
+| `android.app.baidu.DuerShowInputEventReceiver` | `pilferPointers`、`monitorGestureInput` | 夺取触摸手势 |
+| `com.baidu.framework.statistics.*` | `StatisticController`、`BroadcastReporter`、`DuerCpuTracker`、`ThirdAppDownloadEvent` | 框架内部埋点，广播 action `com.baidu.framework.STATISTICS_ACTION` / `CES_STATISTICS_ACTION` |
+
+这些类在 dex 里都标记为 `hiddenapi : 0x0002 (BLOCKED)`：普通应用引用不到，
+系统内的应用可以。
 
 ### 1.4 HOME 拦截机制
 
@@ -114,6 +139,37 @@ b.eq LAB_0000590c        ; w4 == 2 → 返回（跳过）
 
 `w4` 来自 `param_11 - 1`，`param_11` 是上层传入的「启动模式」值。
 
+### 1.6 PCDN 库的真实载体
+
+最初只按「文件系统里有没有这个 `.so`」来找。2026-10-02 复检时发现
+`libcyber-pcdn.so` **同时打包在 APK 内部**，不只是解压出来的 `lib/` 目录：
+
+| 载体 APK | 条目 | 大小 | sha256 |
+| --- | --- | --- | --- |
+| `DuerShowSwan.apk`（`com.baidu.atomkit`） | `lib/arm64-v8a/libcyber-pcdn.so` | 2794344 | `191116ace444b5745a39b4773d7f19b6425c2096349dd1887c239775eab3b329` |
+| `DuerShowMedia.apk`（`com.baidu.duershow.media`） | 同上 | 2794344 | `5848922be3fb24237b28eeba0b0390b8467b2ddf72180cbe518e35a7653acb7c` |
+| `DuerShowLauncher.apk`（`com.baidu.launcher`） | 同上 | 2794344 | `5848922be3fb24237b28eeba0b0390b8467b2ddf72180cbe518e35a7653acb7c` |
+
+另外 `com.baidu.duer.superapp` 是**用户空间应用**，也带一个 PCDN 库：
+
+```text
+/data/app/~~WPlaZtJzxb8uk5Q8xrryNg==/com.baidu.duer.superapp-oJ8M9sGUJlzrsznKCFApMQ==/lib/arm/libpcdn-jni.so
+```
+
+对库本身 `strings`，可以直接看到百度金矿（BJSDK）的痕迹：
+
+```text
+NDK_PCDN / PCDNVOD
+/sdcard/Android/data/com.baidu.haokan/PCDNSDK
+[BJSDK]BJSdkManager::Close return. Report pcdn download info. |...|
+[BJSDK]Report_RealtimeTraffic. |Read(...)|DH_Down_P2PTasks(...)|
+        P2P_Percentage_current/total(...)|DP_Up(...)|DP_Down(...)|
+        Reused_Tasks(...)|Reuse_Ratio(...)|
+```
+
+`DP_Up`（上行）、`P2P_Percentage`、`Reuse_Ratio`、`FreeCDN_Percentage`
+说明它统计的正是上行分发量与复用比例。
+
 ## 🛠️ 二、净化成果
 
 ### 2.1 Magisk 模块 duer_cleanup
@@ -139,6 +195,17 @@ b.eq LAB_0000590c        ; w4 == 2 → 返回（跳过）
     │   └── DuerShowOTA/.replace
     └── etc/hosts
 ```
+
+> ⚠️ **覆盖盲区（2026-10-02 复检发现）**：上面三个 0 字节覆盖只对**被解压到
+> `/system/app/*/lib/` 的那一份**生效。`com.baidu.launcher` 是
+> `UPDATED_SYSTEM_APP`，OTA 之后代码实际在 `/data/app`：
+> `codePath=/data/app/~~-rk9btGny9Lu9xW9pJu_dQ==/com.baidu.launcher-3M3jr0A73iFIVZYxqjmb0A==`，
+> 且它的 `legacyNativeLibraryDir`（`/data/app/.../lib`）是**空的**——native 库
+> 不落地，动态链接器直接从 APK 内加载：
+> `/data/app/.../base.apk!lib/arm64-v8a/libcyber-pcdn.so`（2794344 字节，
+> sha256 `5848922b…cb7c`，与 `/system` 里那份完全相同）。
+> 也就是说被盖住的是没有人读的那一份。
+> `DuerShowMedia` 与 `com.baidu.atomkit` 因为库确实解压到了 `lib/` 目录，覆盖有效。
 
 已禁用组件：
 
@@ -201,7 +268,7 @@ com.baidu.launcher/com.baidu.duer.prism.PrismStatusReiver
 | --- | --- |
 | 通讯限制 | ✅ 已解除 |
 | PCDN 进程 | ✅ 已停止 |
-| PCDN 库文件 | ✅ 已覆盖为 0 字节 |
+| PCDN 库文件 | ⚠️ 部分覆盖：桌面（`com.baidu.launcher`）那份仍从 APK 内加载，见 2.1 / 2.5 |
 | Duerguard | ✅ 已禁用 |
 | GoodFather 家长控制 | ✅ 已禁用 |
 | 百度桌面通讯劫持 | ✅ 已禁用 6 个组件 |
@@ -217,6 +284,7 @@ com.baidu.launcher/com.baidu.duer.prism.PrismStatusReiver
 | `services.jar` 修改 | 一次改 9 个方法导致 bootloop，已回退 |
 | 内核编译 | Termux 环境工具链不兼容 |
 | 蓝牙发射功率 | 未实施 |
+| 桌面 PCDN 库覆盖 | `com.baidu.launcher` 是 `UPDATED_SYSTEM_APP`，代码在 `/data/app`，库从 APK 内直接加载，0 字节挂载覆盖不到 |
 
 ## 📂 三、开源项目
 
@@ -530,6 +598,7 @@ chrt -f -p 7866 10
 /data/tombstones/                        native 崩溃日志
 /sys/fs/pstore/                          PStore 日志（本设备无）
 /proc/last_kmsg                          Last kmsg（本设备无）
+/data/app/~~.../com.baidu.launcher-.../base.apk   桌面实际运行的 APK（PCDN 库内嵌于此）
 ```
 
 ## 🎯 十、后续待办
@@ -542,7 +611,8 @@ chrt -f -p 7866 10
 | 内核编译 | 低 | 需要 x86_64 环境 |
 | 蓝牙功率调整 | 低 | 需 NV 配置或 AT 命令 |
 | `services.jar` 多任务修复 | 低 | 用 LSPosed Hook 更安全 |
+| 桌面 PCDN 库覆盖 | 高 | 需跟随 `pm path` 解析出的活动 codePath；`UPDATED_SYSTEM_APP` 场景要替换 APK 或在链接器层拦截 |
 
 ---
 
-> 文档版本：1.0 ｜ 最后更新：2026-10-01 ｜ 项目地址：<https://github.com/moyingyilang/Fuck4DuerOS>
+> 文档版本：1.1 ｜ 最后更新：2026-10-02 ｜ 项目地址：<https://github.com/moyingyilang/Fuck4DuerOS>
