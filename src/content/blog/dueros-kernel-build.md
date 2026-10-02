@@ -750,3 +750,292 @@ svc power reboot bootloader
 5. **不要相信设备上的配置文件。**`/proc/config.gz` 可能只是近似值。
 6. **GKI 设备的 recovery 与系统共用内核**——这决定了「内核挂了」时
    哪些救援路径有效，必须在刷机前想清楚。
+
+---
+
+## 续篇：刷入、半瘫、失联
+
+上一节停在「内核编好了」。之后发生的事比编译本身精彩得多，也更值得记下来。
+
+### 一、找到了真正的 fastboot 入口
+
+这台机器此前一直被认为「fastboot 不可用」——`adb reboot bootloader` 只能进到
+`18d1:4ee8`，无论是 `fastboot` 还是 `adb` 都谈不进去，设备的特殊按键组合也失效。
+
+翻设备的刷机工具包时发现一个 2048 字节的文件 `misc-fastbootd.bin`：
+
+```
+偏移 0x00   "boot-recovery"
+偏移 0x40   "recovery\n--fastboot\n"
+```
+
+旁边还有对照样本 `misc-wipe.bin`（`recovery\n--wipe_data\n`，标准的恢复出厂）。
+
+**`--fastboot` 是传给 recovery 的参数。** Android 的 `init` 会读 `misc` 分区的
+BCB（Bootloader Control Block）：command 是 `boot-recovery` 就引导 recovery
+ramdisk，而 recovery 收到 `--fastboot` 就启动 **fastbootd**（用户空间 fastboot）。
+
+这是 **AOSP 自己的机制，跟 uboot 的 `cboot` 毫无关系**。
+
+这解释了我此前逆向 uboot 时的困惑：`get mode from firstmode field: %s`、
+`cboot;cboot fastboot` 这些字符串在整个 uboot 载荷里**找不到任何代码引用**，
+而同区域的 `get_miscdata_boot_flag` 有 7 处。当时怀疑是代码被删了
+（设备所有者用 Ghidra 分析也得出同样结论），现在明白了——**那条路径根本不在
+uboot 里**。
+
+操作只有三步：
+
+```sh
+dd if=misc-fastbootd.bin of=/dev/block/by-name/misc bs=2048 count=1 conv=fsync
+sync
+reboot
+```
+
+40 秒后：
+
+```
+Bus 001 Device 082: ID 18d1:4ee0
+fastboot devices
+→ <已隐去的序列号>     fastbootd
+```
+
+`fastbootd` 的能力：
+
+```
+product             xps06e
+is-userspace        yes
+max-download-size   0x10000000 (256 MB)
+slot-count          2
+可刷：boot / init_boot / vendor_boot / dtbo / vbmeta* / super
+```
+
+而且 BCB 是**一次性**的——进入 fastbootd 后 `misc` 前 2048 字节被自动清零，
+`fastboot reboot` 能正常回到 Android。不会把设备锁死。
+
+### 二、把内核塞进 boot 镜像
+
+`magiskboot repack` 在这台设备上**会把 ramdisk 写坏**：我解包原始 boot、
+替换 kernel、重新打包，再解包新镜像验证，发现 ramdisk 前 16 字节全是 0，
+原始的是合法的 cpio magic `070701`。
+
+于是改用**字节级原地替换**。boot 镜像 v4 的布局是顺序的：
+
+```
+header (4096) → kernel (页对齐) → ramdisk (页对齐) → …
+```
+
+新内核 29.7MB，原内核 38.3MB，**原地放得下**。只要写内核区、不动头部字段，
+页对齐后的 ramdisk 起点就完全不变：
+
+```sh
+dd if=new_kernel of=boot.img bs=4096 seek=1 conv=notrunc
+```
+
+验证方法是拿补丁后的镜像和原始备份做 `cmp`：
+
+```
+kernel 区差异:        34,377,385 字节   ← 内核确实换了
+ramdisk 及之后差异:               0 字节   ← 一字未动
+```
+
+（顺便踩了个对齐的坑：`kernel_size=38300160` **不是页对齐的**，
+38300160/4096 = 9350.625，所以 ramdisk 实际在 `4096 + round_up(38300160,4096)`。）
+
+### 三、模块：三个必须跨过的坎
+
+内核换了，模块也必须换——`vermagic` 不匹配的话一个都加载不了。
+把 177 个编出来的模块准备好，遇到三个坎。
+
+**坎一：体积。** 编译时带了 `-g -gdwarf-4`，177 个模块**总共 140MB**，
+而 `vendor_dlkm` 分区只有 **16MB**。
+
+`strip --strip-debug` 之后：
+
+```
+zram.ko          771008 →    67160  (8%)
+chipone-tddi.ko 5259296 →   703768 (13%)
+总计             140.2MB →  12.4MB
+```
+
+`vermagic` 完好保留：`5.4.256-rev6 SMP preempt mod_unload modversions aarch64`。
+
+**坎二：inode 不够。** `e2fsck` 一查：
+
+```
+vendor_dlkm: 137/144 files (0.0% non-contiguous), 4111/4124 blocks
+```
+
+**整个文件系统只有 144 个 inode**，而我们塞了 179 个模块。必须重建。
+
+**坎三：journal 撑爆。** 默认 `mkfs.ext4` 会建 journal，16MB 的盘上光 journal
+就吃掉 4MB，直接报 `Could not allocate block`。
+
+看原始分区的 features 才发现关键：
+
+```
+Filesystem features: ext_attr dir_index filetype extent sparse_super large_file
+                     huge_file uninit_bg dir_nlink extra_isize
+                     ← 没有 has_journal
+Reserved block count: 0
+```
+
+照抄这些参数重建，features 与原始**逐字一致**：
+
+```sh
+mkfs.ext4 -F -q -b 4096 -I 256 -N 600 -m 0 \
+  -O ext_attr,dir_index,filetype,extent,sparse_super,large_file,huge_file,uninit_bg,dir_nlink,extra_isize \
+  -O ^has_journal,^resize_inode,^64bit,^flex_bg,^metadata_csum \
+  -L vendor_dlkm -d <模块目录> out.img
+```
+
+结果：`193/608 files, 3478/4210 blocks`。
+
+还有个命名问题：设备用的 `modules.load` 里是厂商自己的名字，
+`chipone_tddi_9916.ko`（触摸屏）和 `sgm41510-charger.ko`（充电），
+而我们的编译产物叫 `chipone-tddi.ko` 和 `sgm4154x_chg.ko`。
+做法是保留设备原始的 `modules.load`（依赖顺序是对的），
+再为两处改名各做一份副本。
+
+**为什么用 `mkfs.ext4 -d` 而不是挂载**：Android 侧 loop 挂载被 SELinux 拒绝
+（`mount: Invalid argument`），chroot 侧 `/dev/losetup` 找不到空闲 loop
+（Android 的在 `/dev/block/loopN`）。`mkfs.ext4 -d` 直接从目录填充文件系统，
+**完全绕开挂载**。这是这次最有用的一个发现。
+
+### 四、刷入：内核成功，系统半瘫
+
+按「大小分治」的思路：`vendor_dlkm` 17MB 走 fastboot，`boot` 64MB 走 `dd`。
+
+结果 fastboot 那边：
+
+```
+Sending 'boot_a' (65536 KB)  FAILED (Write to device failed in SendBuffer() (Success))
+```
+
+裁到 38.6MB 再试，还是失败。而且过程中还出现过 `< waiting for any device >`。
+
+但 `dd` 那边**成功了**：
+
+```
+boot: 0966329ae04903b4c1ecc2550f3d9b6dac687be78f2bdda36c2b04374571cd2e
+期望: 0966329ae04903b4c1ecc2550f3d9b6dac687be78f2bdda36c2b04374571cd2e   ✓
+```
+
+而 `vendor_dlkm` 写不进去——即使是 `/dev/block/mapper/vendor_dlkm_a` 也不行：
+
+```
+dd if=vendor_dlkm_new.img of=/dev/block/mapper/vendor_dlkm_a bs=1M
+→ 0+0 records out / 0 bytes copied
+```
+
+卸载 `/vendor_dlkm` 之后再写，还是 0 字节。**是 dm 层（只读映射）拒绝的。**
+
+于是设备进入了**最坏的中间状态**：新内核 + 旧模块 → 重启后系统半瘫。
+
+实测确实如此：**界面能用（说明内核启动成功），但设置崩溃、WiFi 没有**。
+原因是设备的 112 个 vendor 模块全是 `5.4.161`，与 `5.4.256` 内核不匹配。
+
+KernelSU 那边我原本以为的「刷自编译内核是单向门」也不成立了——
+但这次暴露了另一个更隐蔽的风险：**`vendor_dlkm` 与 `boot` 必须同进同退。**
+
+### 五、第一次回滚：dd 救场
+
+好在备份是**两份**（设备上一份、主机上一份），而且 `dd` 被证明可靠：
+
+```sh
+su
+dd if=/data/local/tmp/f4d_backup/boot_a.img of=/dev/block/by-name/boot_a bs=1M
+sync
+reboot
+```
+
+设备完全恢复：
+
+```
+USB: 1782:4003          ✓
+ping: 0% packet loss    ✓ WiFi 回来了
+无线 adb: device        ✓
+uname -r: 5.4.161-...   ✓ 原厂内核
+```
+
+**备份救了一切。** 这一步验证了一个重要事实：`boot` 分区可以直接从 Android
+内部 `dd` 写，完全绕开那条不稳的 USB 链路。
+
+### 六、失联
+
+第二次尝试想走 fastbootd 只刷 `vendor_dlkm`（17MB，比失败的 39MB 小一半）。
+写 BCB、重启之后——
+
+**设备再也没有出现在 USB 上。**
+
+```
+/dev/bus/usb/001/  只有 001（根 hub）
+/dev/bus/usb/002/  只有 001（根 hub）
+```
+
+网络也不通。而主机侧一切正常（WiFi 正常、USB 子系统正常）。
+
+**这个现象的判断价值在于**：展锐的 BROM 在 SoC 的掩膜 ROM 里，
+内核崩了、uboot 崩了、boot 分区全毁了，**BROM 依然会枚举**。
+它此前确实出现过（`1782:4d00`，还成功握手到 `BSL_REP_VER: "SPRD3"`）。
+连 BROM 都不出现 ⇒ **问题在物理层，不在软件层。**
+
+回头看，所有怪现象其实是一条线索：
+
+```
+64MB fastboot 传输    → SendBuffer() 失败
+39.5MB 裁剪后         → 同样失败
+BROM 握手             → CMD_CONNECT bootrom 成功，紧接着数据收发必失败
+fastboot              → < waiting for any device >
+最终                  → 设备完全从总线上消失
+```
+
+而同一条链路上**小传输一直正常**（`getvar` 全部秒回）。
+**不是协议问题，是链路质量。**
+
+### 七、这次真正学到的东西
+
+**1. 「能进 fastbootd」不等于「能刷」。** 我验证了 fastbootd 可以进入、
+可以识别设备、可以读变量——就以为救援通路通了。但真正刷写需要的
+是**几十 MB 的可靠传输**，那是完全不同量级的要求。
+
+**2. USB 链路质量是隐形杀手。** 握手成功给人极大的虚假安全感。
+真正该测的是「能不能稳定传完一个 64MB 的镜像」，而不是「能不能 `getvar`」。
+
+**3. Android 作为 USB 主机刷展锐设备不可靠。** 设备所有者此前在
+Windows + QIKU 驱动上跑通过完整流程，因为厂商驱动层代劳了 BROM 的
+模式切换——而这正是 libusb 路径缺失的一环。
+
+**4. `vendor_dlkm` 与 `boot` 必须同进同退。** 单独刷任何一个都会让系统半瘫。
+
+**5. 备份要两份，而且要在不同的物理介质上。** 设备内一份方便 `dd` 回滚，
+主机上一份防止设备完全失联。
+
+**6. `mkfs.ext4 -d` 是处理镜像的利器。** 不想、不能、或者懒得挂载时的首选。
+
+**7. 逆向时找不到引用，先怀疑「这段代码不在这里」，而不是「代码被删了」。**
+我在 uboot 里翻遍了载荷找 `--fastboot` 的处理逻辑，最后发现它压根不在 uboot
+——是 Android 的 `init` 在读 BCB。
+
+### 八、接下来
+
+设备目前的状态是「够不着」而不是「弄坏了」：
+
+```
+boot_a   ← 自编译内核 5.4.256-rev6
+misc     ← fastbootd 的 BCB
+
+uboot / splloader / vendor_boot / vbmeta / super / userdata  ← 全部完好
+```
+
+数据无损，没有任何分区损坏。缺的只是一条能说话的线。
+
+恢复路径已经备好：用设备所有者验证过的 Windows + QIKU 驱动环境，
+按「只读验证 → 清 BCB → 写回 boot」三步走，每步都用最小的写入量试探链路。
+
+而下次刷机前必须先补完模块——尤其是 `mali_kbase`（GPU）。
+这些驱动在厂商源码里是 `kernel_modules/` 下**用 Soong 在树外编译**的
+（设备原厂配置里连 `MALI_MIDGARD` 符号都没有），但目录里有完整的
+Kbuild/Makefile，可以用 `make M=` 树外编出来。
+
+> 编译那部分的故事是顺利的。真正难的从来不是「能不能编出来」，
+> 而是「编出来之后，怎么安全地送到设备上，以及送错了怎么回来」。
