@@ -1039,3 +1039,311 @@ Kbuild/Makefile，可以用 `make M=` 树外编出来。
 
 > 编译那部分的故事是顺利的。真正难的从来不是「能不能编出来」，
 > 而是「编出来之后，怎么安全地送到设备上，以及送错了怎么回来」。
+
+---
+
+## 附：完整推理链
+
+上面记的是「发生了什么」。这一节记「怎么想出来的」——
+每一步的命题、假设、检验方式和最终结论。
+
+### 推理一：`--fastboot` 的处理逻辑不在 uboot 里
+
+**初始命题**：这台机器的 fastboot 入口被厂商删掉了。
+
+**依据**：在 uboot 载荷里，四个模式选择相关的字符串有零引用：
+
+```
+测试项                            ADRP+ADD  ADRP+LDR  ADR  8字节指针  4字节
+get mode from firstmode field         0         0     0       0       0
+Detect the firsrt_mode flag           0         0     0       0       0
+cboot;cboot fastboot                  0         0     0       0       0
+first_mode=%x                         0         0     0       0       0
+--- 对照（同区域）---
+get_miscdata_boot_flag                7处       -     -       1       1
+```
+
+而设备所有者用 Ghidra 独立分析也得出「找不到调用」。
+
+**先排除测量误差**：扫描器必须能证明自己是有效的。
+
+- 覆盖了四种取址模式：`ADRP+ADD`、`ADRP+ADD.W`、`ADRP+LDR`、`ADR`
+- ADD 与 ADRP 的间隔放宽到 1~8 条
+- 处理了 `sh=1` 的 `add x, x, #imm, lsl #12` 形式
+- 处理了 ADRP 计算目标时 PC 的页对齐（这是第一次写错的坑）
+- **同区域的 `get_miscdata_boot_flag` 有 7 处引用** —— 阳性对照通过
+
+所以「零引用」是可靠观测。
+
+**再补一条独立证据**：`first_mode=%x` 这个字符串按设计是用来拼 bootargs 片段的
+（它的邻居是 `cali_mode=%x`、`earlycon=...`、` androidboot.skuid=%s`）。
+如果这段代码还在，启动时 `/proc/cmdline` 里必然出现 `first_mode=`。实测：
+
+```
+earlycon console=ttySPRD1,115200n8 ... androidboot.skuid=600WW
+androidboot.slot_suffix=_a androidboot.force_normal_boot=1 ...
+```
+
+**完全没有 `first_mode=`。** 两条独立证据指向同一结论。
+
+**假设收敛**：代码确实不在了。
+
+**但这个结论后来被推翻了一半。** 发现 `misc-fastbootd.bin` 之后：
+
+```
+偏移 0x40   "recovery\n--fastboot\n"
+```
+
+`--fastboot` 是 **AOSP recovery 的标准参数**。Android 的 `init` 读 `misc` 分区
+的 BCB，command 是 `boot-recovery` 就引导 recovery ramdisk，recovery 收到
+`--fastboot` 则启动 fastbootd（用户空间 fastboot）。
+
+**修正后的结论**：不是「代码被删了」，而是「**这段逻辑本来就不在 uboot 里**」。
+uboot 里那几个字符串是它自己解析 BCB 的痕迹，而 fastbootd 的入口在 Android 侧。
+
+**方法论教训**：找不到引用时，第一反应应该是「这段代码不在我扫的范围里」，
+而不是「代码被删了」。我当时把范围限定在 uboot 载荷内，这个前提本身没被质疑过。
+
+> 而这次是有阳性对照的（同区域另一个字符串有 7 处引用），
+> 所以「观测」没问题，「解释」错了。**观测可靠 ≠ 推论可靠。**
+
+### 推理二：设备失联是物理层问题，不是软件层
+
+**观测**：设备完全不出现在 USB 总线上。
+
+```
+/dev/bus/usb/001/  只有 001（根 hub）
+/dev/bus/usb/002/  只有 001（根 hub）
+```
+
+**候选假设**：
+
+| 假设 | 检验 | 结果 |
+| --- | --- | --- |
+| A. 内核崩了 | BROM 在掩膜 ROM 里，不受内核影响 | ✗ 排除 |
+| B. uboot 崩了 | 同上，BROM 在 uboot 之前 | ✗ 排除 |
+| C. boot 分区内容非法 | BROM 不读 boot 分区 | ✗ 排除 |
+| D. 设备没电 | 观察屏幕/充电反应 | 待查 |
+| E. USB 物理链路 | 见下 | ✓ 最可能 |
+
+**关键前提**：展锐 BROM 位于 SoC 的**掩膜 ROM**，A 到 C 的任何损坏都不影响它
+枚举。而且 BROM 在**同一台主机上此前确实出现过**：
+
+```
+Bus 001 Device 065: ID 1782:4d00
+libusb_control_transfer ok
+CHECK_BAUD bootrom
+BSL_REP_VER: "SPRD3\0"
+CMD_CONNECT bootrom
+```
+
+既然 BROM 曾经在这条链路上工作过，现在却不出现，那么**软件层的一切假设都被排除**。
+
+**回溯性验证**：这个结论还能解释之前所有的怪现象。
+
+```
+64MB fastboot 传输    → SendBuffer() 失败
+39.5MB 裁剪后         → 同样失败
+BROM 握手             → CMD_CONNECT 成功，紧接着数据收发必失败
+fastboot              → < waiting for any device >
+最终                  → 设备彻底消失
+```
+
+而同一条链路上**小传输一直正常**（`getvar` 全部秒回）。
+一个「链路质量」的假设能同时解释全部现象，而任何「软件损坏」的假设
+都解释不了「BROM 曾经工作过」。
+
+**结论**：物理层。**能解释全部现象的最小假设，就是最可能的那个。**
+
+### 推理三：内核确实刷进去了
+
+**观测**：刷完 `boot` 后设备枚举为 `1782:4003`（Android USB gadget 模式），
+界面可用（能打开 WiFi 设置），但设置崩溃、无 WiFi。
+
+**推理**：
+
+1. `1782:4003` 意味着 **USB gadget 已经配置完成** —— 这是 Android 的 `init`
+   干的活。所以内核启动了，`init` 跑到至少第二个阶段。
+2. 界面可用 ⇒ SurfaceFlinger 起来了 ⇒ 显示通路正常。
+3. 但设置崩溃、WiFi 无 ⇒ 依赖厂商模块的 HAL 全部失败。
+
+**因果关系验证**：内核是 `5.4.256`，而设备的 112 个 vendor 模块全是 `5.4.161`：
+
+```
+我们的内核   vermagic = 5.4.256-rev6
+设备模块     vermagic = 5.4.161-ab20250825010819358
+```
+
+`vermagic` 不匹配 ⇒ **一个模块都加载不了**。WiFi（`sc2355_sdio_wlan.ko`）、
+触摸、传感器、GPU 全是模块，于是系统半瘫。
+
+**反证**：回滚 `boot` 之后设备完全恢复（`uname -r` 回到 `5.4.161-...`，
+WiFi 回来，设置正常）。**如果崩溃另有原因，回滚不会同时修好所有症状。**
+
+**结论**：`boot-newkernel.img` 本身是好的，问题只在「没把匹配的模块一起送进去」。
+
+### 推理四：`vendor_dlkm` 无法从 Android 内部写入
+
+**观测**：
+
+```
+dd if=vendor_dlkm_new.img of=/dev/block/mapper/vendor_dlkm_a bs=1M
+→ 0+0 records out / 0 bytes copied
+```
+
+**候选假设与检验**：
+
+| 假设 | 检验方法 | 结果 |
+| --- | --- | --- |
+| 只读挂载挡住 | 先 `umount /vendor_dlkm` 再写 | 仍 0 字节 → ✗ 排除 |
+| 权限不足 | 以 root 运行 | 已是 root → ✗ 排除 |
+| dm 层只读映射 | 看设备类型 | `/dev/block/mapper/vendor_dlkm_a -> dm-4`，是 dm 设备 |
+
+卸载后仍写 0 字节，说明拒绝发生在 **block 层而非 VFS 层**。
+`dm-4` 是动态分区的逻辑映射，只读。
+
+**推论**：这正是 **fastbootd 存在的意义** —— 它会先 unmap 逻辑分区、
+写裸区、再 remap。所以 `vendor_dlkm` 只能走 fastbootd，而 `boot` 是物理分区，
+可以直接 `dd`。
+
+**这个结论直接决定了下次刷机的策略**：
+
+```
+vendor_dlkm  →  只能 fastbootd
+boot         →  dd 或 fastbootd 都行
+```
+
+### 推理五：字节级替换内核是安全的
+
+**观测**：`magiskboot repack` 产出的镜像里，ramdisk 前 16 字节全是 0，
+原始的是合法 cpio magic `070701`。
+
+**推理**：既然打包工具不可信，那就**只改必须改的那部分**。
+
+boot 镜像 v4 的布局是**顺序**的：
+
+```
+header (4096)  →  kernel (页对齐)  →  ramdisk (页对齐)  →  …
+```
+
+关键事实：**新内核 29.7MB < 原内核 38.3MB**，所以原地放得下。
+而只要不动 `kernel_size` 头部字段，页对齐后的 ramdisk 起点就完全不变。
+
+**形式化**：设 `K` 为头部声明的 kernel_size，`A = round_up(K, 4096)`。
+ramdisk 起点是 `4096 + A`。替换内核内容**不改变 K**，因此 `A` 不变，
+ramdisk 的位置不变。✓
+
+**验证方式**：不能只看「能不能启动」，要用 `cmp` 做**逐字节差分**：
+
+```
+kernel 区差异:        34,377,385 字节   ← 内核确实换了
+ramdisk 及之后差异:               0 字节   ← 一字未动
+```
+
+**附带的坑**：`kernel_size = 38300160` **不是页对齐的**
+（38300160 / 4096 = 9350.625，而 9351 × 4096 = 38301696）。
+我一开始用 `4096 + kernel_size` 去定位 ramdisk，读出来全是 0，差点误判成「ramdisk 空了」。
+
+### 推理六：模块打包必须跨过三道门
+
+**门一：体积。** 命题是「把 177 个模块放进 16MB 的分区」。
+
+```
+未 strip 总计  140.2 MB
+分区容量        16.4 MB
+```
+
+差了将近 9 倍。原因很明确：编译时带了 `-g -gdwarf-4`。
+推断 debug 段占绝大部分体积 → 用 `strip --strip-debug` 验证：
+
+```
+zram.ko          771008 →    67160  (8%)
+chipone-tddi.ko 5259296 →   703768 (13%)
+总计             140.2MB →  12.4MB
+```
+
+符合「调试信息占 87%~92%」的推断 ✓。且 `vermagic` 必须保留——实测保留 ✓。
+
+**门二：inode。** 写入前先查文件系统：
+
+```
+e2fsck: vendor_dlkm: 137/144 files, 4111/4124 blocks
+```
+
+**整个文件系统只有 144 个 inode**，而我们塞 179 个模块。
+这是「空间够但结构上装不下」——只看容量会发现不了。
+
+**门三：journal。** 重建文件系统时第一次失败了：
+
+```
+mkfs.ext4: Could not allocate block in ext2 filesystem
+           while populating file system
+```
+
+14MB 数据放进 16.4MB 的盘，为什么装不下？去看原始分区的参数：
+
+```
+Filesystem features: ext_attr dir_index filetype extent sparse_super large_file
+                     huge_file uninit_bg dir_nlink extra_isize
+                     ← 没有 has_journal
+Reserved block count: 0
+```
+
+**默认 `mkfs.ext4` 会建 journal**，16MB 的盘上光 journal 就吃掉约 4MB。
+照抄原始 features 才成功，最终两者**逐字一致**：
+
+```
+原始:  ext_attr dir_index filetype extent sparse_super large_file huge_file uninit_bg dir_nlink extra_isize
+新建:  ext_attr dir_index filetype extent sparse_super large_file huge_file uninit_bg dir_nlink extra_isize
+```
+
+**额外发现**：怎么把文件放进镜像？
+
+- Android 侧 `mount -o loop` → SELinux 拒绝（`Invalid argument`）
+- chroot 侧 `losetup` → `/dev/loopN` 不存在（Android 的在 `/dev/block/loopN`）
+- Android 的 loop 设备又被动态分区占满
+
+三个方向的排除引出一个更简单的答案：**`mkfs.ext4 -d`**，直接从目录填充，
+**根本不需要挂载**。绕开了整类问题。
+
+### 推理七：为什么救援要「先 2KB 再 64MB」
+
+**观测**：这条链路小传输稳定，大传输必失败。
+
+**推论**：既然失败概率与传输量相关，那么**每一步都应该用能满足目的的最小写入量**。
+
+于是救援步骤被设计成三级递进：
+
+```
+第一步  read_part miscdata 8192 64   →  读 64 字节，不写任何东西
+第二步  w misc misc-zero.bin          →  只写 2KB
+第三步  w boot boot_a.img reset       →  写 64MB
+```
+
+前两步的作用不是「完成救援」，而是**在低风险下验证链路的可靠性等级**。
+如果 2KB 都写不进去，就没必要去试 64MB——那样只会把设备推入更糟的状态。
+
+**这个原则正是这次教训的产物**：上次我「验证了 fastbootd 可用」就动手刷，
+但验证用的是 `getvar`（几十字节），而实际刷写要传 64MB——
+**验证的强度必须匹配操作的风险。**
+
+### 总结：这次真正学到的
+
+**1. 观测可靠不等于推论可靠。**
+uboot 那批字符串零引用是可靠观测（有阳性对照），但我把结论下成「代码被删了」，
+而正确解释是「代码不在这里」。**要主动质疑自己的搜索范围。**
+
+**2. 能解释全部现象的最小假设，最可能是对的。**
+「USB 链路质量」一个假设解释了 BROM 卡住、fastboot 失败、设备消失三件事，
+而任何软件假设都做不到。
+
+**3. 验证的强度必须匹配操作的风险。**
+用 `getvar` 验证通过，就敢传 64MB——这是这次代价最大的判断失误。
+
+**4. 阴性结果要交叉验证。**
+`first_mode=%x` 不出现，是用两条独立证据（uboot 零引用 + cmdline 无该字段）
+才敢下的结论。
+
+**5. 排除法要穷尽方向。**
+`vendor_dlkm` 写不进去，依次排除「挂载」「权限」「VFS 层」，
+才定位到「dm 层」——然后才知道正确的工具是 fastbootd。
