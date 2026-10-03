@@ -1,0 +1,64 @@
+name: Refresh commit stats
+
+# 定时把 /activity 的数据快照刷新一遍并提交回仓库。
+#
+# 为什么放 CI 而不是让访客点按钮：
+#   1. Actions 自带 GITHUB_TOKEN，配额是 1000 次/小时/仓库（匿名只有 60 次/小时/IP）；
+#   2. 访客不必为了看一张图花掉自己的配额；
+#   3. 数据随提交固化，构建产物里自然就是新的一份。
+#
+# 想要更高配额（5000 次/小时）：在仓库 Secrets 里加 SITE_STATS_TOKEN
+# （细粒度 PAT，只需要「公开仓库只读」权限）；没配置就自动回退到 GITHUB_TOKEN。
+# 两种情况下令牌都只存在于 runner 的环境变量里，不会进入仓库或前端产物。
+
+on:
+  schedule:
+    # 每 3 小时一次；错开整点，避开 Actions 的调度高峰
+    - cron: '13 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: refresh-commits
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 脚本只用到 node 内置模块与仓库内的 src/utils，因此不需要 pnpm install
+      - name: 重新采集快照
+        env:
+          GITHUB_TOKEN: ${{ secrets.SITE_STATS_TOKEN || secrets.GITHUB_TOKEN }}
+        run: node scripts/gen-commit-stats.mjs
+
+      - name: 有变化就提交
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/data/commit-stats.json
+          if git diff --cached --quiet; then
+            echo "数据没有变化，不提交"
+            exit 0
+          fi
+          git commit -m "chore(activity): 刷新提交统计快照"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKEN 推上去的提交不会触发其它 workflow（GitHub 的既定行为），
+      # 所以这里显式派发一次部署。workflow_dispatch 恰好是该规则的例外。
+      - name: 触发部署
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main
