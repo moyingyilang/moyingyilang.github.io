@@ -1,0 +1,1048 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { REPO_URL, SITE_AUTHOR } from '../consts';
+import stats from '../data/commit-stats.json';
+import { RECENT_DAYS, STATS_USER } from '../utils/github-stats.js';
+import {
+	DEFAULT_MODE_ID,
+	DEFAULT_RANGE_ID,
+	MODES,
+	RANGE_GROUPS,
+	defaultActiveNames,
+	modeLabel,
+	renderChart,
+	renderLegend,
+	renderRepoRows,
+	summarize,
+	windowFor,
+} from '../utils/commit-chart.js';
+
+/**
+ * 构建期先把默认视图画好：
+ * 禁用 JS 时访客照样能看到完整的曲线、图例与明细表，
+ * 页面里的脚本只负责「切换 / 悬停 / 抓取最新」这些增强。
+ */
+const range = DEFAULT_RANGE_ID;
+const mode = DEFAULT_MODE_ID;
+
+const activeWindow = windowFor(stats, range);
+const names = defaultActiveNames(stats, { range });
+const summary = summarize(stats, { names, range });
+const chart = renderChart(stats, { names, range, mode, width: 960, height: 400 });
+const legend = renderLegend(stats, { names, range });
+const rows = renderRepoRows(stats, { names, range });
+
+const snapshotISO = stats.generatedAt;
+const snapshotUTC = `${snapshotISO.slice(0, 10)} ${snapshotISO.slice(11, 16)}（UTC）`;
+const ageDays = Math.floor((Date.now() - new Date(snapshotISO).getTime()) / 86_400_000);
+const snapshotStale = ageDays > 14;
+
+const caption = (window) =>
+	`窗口 ${window.label} · 纵轴为${window.bucketLabel}提交数` +
+	(window.kind === 'hours' ? ' · 时间轴为北京时间（UTC+8）' : ' · 每格一周（按 UTC 周日切分）');
+---
+
+<BaseLayout
+	title="项目提交折线图"
+	description={`@${STATS_USER} 各公开仓库的提交折线图：从近 12 小时到近 52 周的提交曲线、活跃项目与最近提交时间，数据取自 GitHub。`}
+>
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<span aria-current="page">项目提交</span>
+	</nav>
+
+	<div class="page-head">
+		<span class="page-head__eyebrow badge">独立页面</span>
+		<h1 class="page-title">项目提交折线图</h1>
+		<p class="page-desc">
+			{SITE_AUTHOR}（@{STATS_USER}）各公开仓库的提交曲线。窗口从近 12 小时到近 52 周，
+			短期用提交级时间戳现切桶，长期用 GitHub 的周统计；只计仓库拥有者本人的提交，
+			默认按「最近更新」排在前面的项目出图。
+		</p>
+	</div>
+
+	<section class="card card--pad cc-panel reveal" data-cc-root data-cc-snapshot={snapshotISO}>
+		<div class="cc-toolbar">
+			{
+				RANGE_GROUPS.map((group) => (
+					<>
+						<span class="cc-toolbar__label">{group.label}</span>
+						<div class="cc-seg" role="group" aria-label={`${group.label}窗口`}>
+							{group.ranges.map((item) => (
+								<button
+									type="button"
+									data-cc-range={item.id}
+									aria-pressed={item.id === range ? 'true' : 'false'}
+								>
+									{item.label}
+								</button>
+							))}
+						</div>
+					</>
+				))
+			}
+
+			<div class="cc-seg" role="group" aria-label="统计口径">
+				{
+					MODES.map((item) => (
+						<button
+							type="button"
+							data-cc-mode={item.id}
+							aria-pressed={item.id === mode ? 'true' : 'false'}
+							data-cc-mode-label
+						>
+							{modeLabel(activeWindow, item.id)}
+						</button>
+					))
+				}
+			</div>
+
+			<button type="button" class="btn cc-refresh" data-cc-refresh>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 5v6h-6"></path>
+				</svg>
+				抓取最新
+			</button>
+		</div>
+
+		<div class="cc-metrics">
+			<div class="cc-metric">
+				<span class="cc-metric__value" data-cc-metric="commits">{summary.commits}</span>
+				<span class="cc-metric__label">窗口内提交</span>
+			</div>
+			<div class="cc-metric">
+				<span class="cc-metric__value" data-cc-metric="active">{summary.activeRepos}/{summary.repos}</span>
+				<span class="cc-metric__label">有提交的项目</span>
+			</div>
+			<div class="cc-metric">
+				<span class="cc-metric__value" data-cc-metric="peak">{summary.peak?.value ?? 0}</span>
+				<span class="cc-metric__label">
+					<span data-cc-label="peak">{summary.peakLabel}</span>
+					<span data-cc-metric="peakBucket">{summary.peak?.tick ?? '—'}</span>
+				</span>
+			</div>
+			<div class="cc-metric">
+				<span class="cc-metric__value" data-cc-metric="repos">{stats.repos.length}</span>
+				<span class="cc-metric__label">收录的项目</span>
+			</div>
+		</div>
+
+		<p class="cc-status" data-cc-status>
+			数据更新于 {snapshotUTC} · 页面内快照{snapshotStale ? `（已 ${ageDays} 天未更新，可点「抓取最新」）` : ''}
+		</p>
+
+		<div class="cc-plot" data-cc-plot>
+			<div data-cc-canvas set:html={chart}></div>
+			<div class="cc-tip glass glass--strong" data-cc-tip hidden></div>
+		</div>
+
+		<p class="cc-caption" data-cc-caption>{caption(activeWindow)} · 点下方图例或表格行可开关对应曲线</p>
+
+		<div class="cc-legend" data-cc-legend set:html={legend}></div>
+	</section>
+
+	<section class="stack">
+		<h2 class="section-heading">项目清单</h2>
+		<div class="table-wrap cc-tablewrap">
+			<table class="cc-table">
+				<thead>
+					<tr>
+						<th scope="col">项目</th>
+						<th scope="col">语言</th>
+						<th scope="col" class="cc-num">窗口内提交</th>
+						<th scope="col" class="cc-num" data-cc-th="active">活跃{summary.activeLabel}</th>
+						<th scope="col">最近提交</th>
+						<th scope="col" class="cc-num">Star</th>
+					</tr>
+				</thead>
+				<tbody data-cc-rows set:html={rows}></tbody>
+			</table>
+		</div>
+		<p class="cc-note">
+			「最近提交」是 GitHub 记录的 <code>pushed_at</code>，包含推送别人提交的情况，因此可能早于或晚于曲线上的最后一格。
+			Star 数少的项目多为自用小工具，仅供参考。
+		</p>
+	</section>
+
+	<section class="card card--pad reveal">
+		<div class="prose">
+			<h2 class="section-heading">这些数字是怎么来的</h2>
+			<ul>
+				<li>
+					<strong>长期窗口（13 / 26 / 52 周）</strong>来自 GitHub REST API 的
+					<code>/repos/{'{owner}'}/{'{repo}'}/stats/participation</code>，
+					它返回最近 52 周（按 UTC 周日切分）的逐周提交数。
+				</li>
+				<li>
+					<strong>近期窗口（12 小时 ~ 7 天）</strong>来自提交级明细
+					<code>/repos/{'{owner}'}/{'{repo}'}/commits</code>，按作者过滤后把时间戳现场切桶 ——
+					周桶画不出小时级曲线。时间轴统一按<strong>北京时间（UTC+8）</strong>对齐，
+					所以构建期与访客浏览器画出来的格子完全一致。
+				</li>
+				<li>
+					两个窗口口径都<strong>只统计仓库拥有者本人</strong>的提交，fork 仓库里上游作者的提交不会混进来。
+					两套数据来自不同接口，个别提交可能对不上（合并提交、rebase 的处理方式不同）。
+				</li>
+				<li>
+					页面内嵌的是一份<strong>构建期快照</strong>：长期窗口是完整的 52 周，
+					近期明细只覆盖最近 {RECENT_DAYS} 天、且只为最近推送过的仓库抓取。
+					仓库还挂了每 3 小时一次的定时刷新（GitHub Actions），
+					所以正常访问不需要为这张图花任何配额。
+				</li>
+				<li>
+					点「抓取最新」会以<strong>访客自己的网络匿名请求</strong> GitHub（匿名额度 60 次/小时/IP）：
+					每次只请求「窗口内可能有提交」的仓库，并带上 ETag 条件请求 ——
+					数据没变时 GitHub 返回 304，而 304 不计配额；十分钟内重复点更是直接复用本机数据。
+					抓到的结果只写进本机 <code>localStorage</code>，不会上传到任何地方。
+				</li>
+				<li>
+					需要更高配额是在<strong>服务端</strong>给的，不在浏览器里：
+					本机跑脚本可用 <code>GITHUB_TOKEN=xxx pnpm run refresh:commits</code>（5000 次/小时），
+					定时任务用 Actions 自带的令牌（1000 次/小时/仓库）。
+					令牌只从环境变量读，页面这条路径结构上就不会携带凭据。
+				</li>
+			</ul>
+
+			<p>
+				想直接看仓库本身，可以到
+				<a href={`https://github.com/${STATS_USER}`} target="_blank" rel="noopener noreferrer">GitHub @{STATS_USER}</a>
+				或本站的 <a href={REPO_URL} target="_blank" rel="noopener noreferrer">站点仓库</a>。
+			</p>
+		</div>
+	</section>
+</BaseLayout>
+
+<!--
+	样式用 is:global：SVG、图例与表格行都由渲染函数生成（构建期 set:html + 运行期重画），
+	Astro 的作用域属性加不到这些节点上，用普通 <style> 会全部失效。
+-->
+<style is:global>
+	.cc-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.cc-toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem 0.55rem;
+	}
+
+	.cc-toolbar__label {
+		font-size: 0.74rem;
+		color: var(--text-tertiary);
+	}
+
+	/* 分段控件：窗口两组 + 口径一组 */
+	.cc-seg {
+		display: inline-flex;
+		gap: 2px;
+		padding: 2px;
+		border-radius: var(--r-pill);
+		border: 1px solid var(--stroke);
+		background: var(--surface-sunken);
+	}
+
+	.cc-seg button {
+		border: 0;
+		background: transparent;
+		color: var(--text-secondary);
+		font: inherit;
+		font-size: 0.78rem;
+		line-height: 1.6;
+		padding: 0.24rem 0.7rem;
+		border-radius: var(--r-pill);
+		cursor: pointer;
+		transition: all var(--dur-fast) var(--ease-standard);
+	}
+
+	.cc-seg button:hover {
+		color: var(--text);
+		background: var(--surface-hover);
+	}
+
+	.cc-seg button[aria-pressed='true'] {
+		background: var(--accent);
+		color: var(--accent-fg);
+	}
+
+	.cc-refresh {
+		margin-left: auto;
+		font-size: 0.82rem;
+		border-radius: var(--r-pill);
+	}
+
+	.cc-refresh svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.cc-refresh[disabled] {
+		opacity: 0.6;
+		cursor: progress;
+	}
+
+	.cc-metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.6rem;
+		padding: 0.75rem 1rem;
+		border-radius: var(--r-md);
+		background: var(--surface-sunken);
+	}
+
+	.cc-metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+
+	.cc-metric__value {
+		font-family: var(--font-display);
+		font-size: 1.3rem;
+		font-weight: 600;
+		line-height: 1.15;
+		color: var(--text);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cc-metric__label {
+		font-size: 0.74rem;
+		color: var(--text-tertiary);
+	}
+
+	.cc-status {
+		margin: 0;
+		font-size: 0.78rem;
+		color: var(--text-tertiary);
+	}
+
+	.cc-status.is-error {
+		color: #c2410c;
+	}
+
+	html[data-theme='dark'] .cc-status.is-error {
+		color: #fb923c;
+	}
+
+	.cc-plot {
+		position: relative;
+	}
+
+	.cc-plot svg {
+		overflow: visible;
+	}
+
+	.cc-caption {
+		margin: -0.4rem 0 0;
+		font-size: 0.76rem;
+		color: var(--text-tertiary);
+	}
+
+	/* ---------------------------------------------------------- 悬停浮层 */
+
+	.cc-tip {
+		position: absolute;
+		top: 0.4rem;
+		transform: translateX(-50%);
+		min-width: 9.5rem;
+		max-width: 15rem;
+		padding: 0.5rem 0.65rem;
+		border-radius: var(--r-md);
+		font-size: 0.76rem;
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	.cc-tip[hidden] {
+		display: none;
+	}
+
+	.cc-tip__head {
+		margin: 0 0 0.35rem;
+		font-weight: 600;
+		color: var(--text);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cc-tip__list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.cc-tip__list li {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--text-secondary);
+	}
+
+	.cc-tip__dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex: none;
+	}
+
+	.cc-tip__name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 8.5rem;
+	}
+
+	.cc-tip__value {
+		margin-left: auto;
+		color: var(--text);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cc-tip__total {
+		margin: 0.35rem 0 0;
+		padding-top: 0.3rem;
+		border-top: 1px solid var(--stroke);
+		color: var(--text-tertiary);
+		display: flex;
+		gap: 0.4rem;
+	}
+
+	/* -------------------------------------------------------------- 图例 */
+
+	.cc-legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.cc-legend__item {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.42rem;
+		padding: 0.26rem 0.6rem;
+		border-radius: var(--r-pill);
+		border: 1px solid var(--stroke);
+		background: transparent;
+		color: var(--text-secondary);
+		font: inherit;
+		font-size: 0.78rem;
+		line-height: 1.5;
+		cursor: pointer;
+		transition: all var(--dur-fast) var(--ease-standard);
+	}
+
+	.cc-legend__item:hover {
+		border-color: var(--stroke-strong);
+		color: var(--text);
+	}
+
+	.cc-legend__item.is-on {
+		color: var(--text);
+		background: var(--surface-hover);
+	}
+
+	.cc-legend__dot {
+		width: 11px;
+		height: 11px;
+		flex: none;
+		border-radius: 50%;
+		border: 2px solid var(--cc-color);
+		background: transparent;
+		transition: background var(--dur-fast) var(--ease-standard);
+	}
+
+	.cc-legend__item.is-on .cc-legend__dot {
+		background: var(--cc-color);
+	}
+
+	.cc-legend__count {
+		font-size: 0.72rem;
+		color: var(--text-tertiary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* -------------------------------------------------------------- 表格 */
+
+	.cc-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.86rem;
+	}
+
+	.cc-table th,
+	.cc-table td {
+		padding: 0.6rem 0.9rem;
+		text-align: left;
+		border-bottom: 1px solid var(--stroke);
+		vertical-align: top;
+	}
+
+	.cc-table th {
+		font-weight: 600;
+		color: var(--text);
+		background: var(--surface-hover);
+		white-space: nowrap;
+	}
+
+	.cc-table tbody tr:last-child td {
+		border-bottom: none;
+	}
+
+	.cc-table tbody tr[data-cc-repo] {
+		cursor: pointer;
+		transition: background var(--dur-fast) var(--ease-standard);
+	}
+
+	.cc-table tbody tr[data-cc-repo]:hover {
+		background: var(--surface-hover);
+	}
+
+	.cc-table tbody td:first-child {
+		border-left: 2px solid transparent;
+	}
+
+	.cc-table tbody tr.is-active td:first-child {
+		border-left-color: var(--accent);
+	}
+
+	.cc-num {
+		text-align: right !important;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	.cc-table__name a {
+		font-weight: 600;
+	}
+
+	.cc-table__desc {
+		display: block;
+		margin-top: 0.2rem;
+		font-size: 0.76rem;
+		color: var(--text-tertiary);
+		max-width: 34rem;
+	}
+
+	.cc-badge {
+		display: inline-block;
+		margin-left: 0.35rem;
+		padding: 0.05rem 0.4rem;
+		border-radius: var(--r-pill);
+		font-size: 0.68rem;
+		color: var(--text-tertiary);
+		background: var(--surface-hover);
+		vertical-align: 1px;
+	}
+
+	.cc-dim {
+		color: var(--text-tertiary);
+	}
+
+	.cc-note {
+		margin: 0;
+		font-size: 0.78rem;
+		color: var(--text-tertiary);
+		line-height: 1.7;
+	}
+
+	@media (max-width: 640px) {
+		.cc-metrics {
+			gap: 1.1rem 1.4rem;
+		}
+
+		.cc-refresh {
+			margin-left: 0;
+		}
+	}
+</style>
+
+<script>
+	import snapshot from '../data/commit-stats.json';
+	import { STATS_USER, collectCommitStats, createEtagCache } from '../utils/github-stats.js';
+	import {
+		DEFAULT_MODE_ID,
+		DEFAULT_RANGE_ID,
+		MODES,
+		RANGES,
+		chartColor,
+		chartLayout,
+		defaultActiveNames,
+		escapeHtml,
+		findRange,
+		formatRelative,
+		indexAtX,
+		modeLabel,
+		niceScale,
+		renderChart,
+		renderLegend,
+		renderRepoRows,
+		summarize,
+		windowFor,
+		windowValues,
+	} from '../utils/commit-chart.js';
+
+	/** 用户的选择（窗口 / 口径 / 勾了哪些项目） */
+	const PREF_KEY = 'moying-commit-chart';
+	/** 「抓取最新」抓到的那一份，下次打开直接复用，省一次配额 */
+	const LIVE_KEY = 'moying-commit-live';
+
+	/** 快照超过这个天数就提示一下可以重新抓 */
+	const STALE_DAYS = 14;
+	/** 近期窗口对数据的「新鲜度」很敏感：超过这个小时数就提醒去抓一次 */
+	const STALE_HOURS = 3;
+	/** 刚抓过的数据在这么多分钟内直接复用，连条件请求都不发（一次请求都不花） */
+	const REUSE_MINUTES = 10;
+
+	const root = document.querySelector('[data-cc-root]');
+
+	if (root) {
+		const dom = {
+			canvas: root.querySelector('[data-cc-canvas]'),
+			plot: root.querySelector('[data-cc-plot]'),
+			tip: root.querySelector('[data-cc-tip]'),
+			legend: root.querySelector('[data-cc-legend]'),
+			// 明细表在卡片之外（它自己是一节），所以从文档里取
+			rows: document.querySelector('[data-cc-rows]'),
+			status: root.querySelector('[data-cc-status]'),
+			caption: root.querySelector('[data-cc-caption]'),
+			refresh: root.querySelector('[data-cc-refresh]'),
+			metrics: new Map(
+				[...root.querySelectorAll('[data-cc-metric]')].map((el) => [el.dataset.ccMetric, el]),
+			),
+			labels: new Map(
+				[...root.querySelectorAll('[data-cc-label]')].map((el) => [el.dataset.ccLabel, el]),
+			),
+			modeButtons: [...root.querySelectorAll('[data-cc-mode-label]')],
+			activeHeader: document.querySelector('[data-cc-th="active"]'),
+		};
+
+		const readJSON = (key) => {
+			try {
+				return JSON.parse(localStorage.getItem(key) ?? 'null');
+			} catch {
+				return null;
+			}
+		};
+
+		/** 本地缓存只有在比页面内快照更新时才用它 */
+		function pickStats() {
+			const cached = readJSON(LIVE_KEY);
+			if (cached?.generatedAt && cached.weeks && Array.isArray(cached.repos)) {
+				if (new Date(cached.generatedAt) > new Date(snapshot.generatedAt)) return { stats: cached, live: true };
+			}
+			return { stats: snapshot, live: false };
+		}
+
+		/** ETag 缓存：数据没变时 GitHub 回 304，而 304 不计入速率限制 */
+		const etagCache = createEtagCache();
+
+		const initial = pickStats();
+		const state = {
+			stats: initial.stats,
+			live: initial.live,
+			range: DEFAULT_RANGE_ID,
+			mode: DEFAULT_MODE_ID,
+			names: new Set(defaultActiveNames(initial.stats, { range: DEFAULT_RANGE_ID })),
+			busy: false,
+			/** 最近一次「抓取最新」的网络开销，展示在状态行里 */
+			lastRun: null,
+		};
+
+		/* --------------------------------------------------------- 偏好存取 */
+
+		function persist() {
+			try {
+				localStorage.setItem(
+					PREF_KEY,
+					JSON.stringify({ range: state.range, mode: state.mode, names: [...state.names] }),
+				);
+			} catch {
+				/* 隐私模式下写不了 localStorage，忽略即可 */
+			}
+		}
+
+		function restore() {
+			const saved = readJSON(PREF_KEY);
+			if (!saved) return;
+
+			if (RANGES.some((item) => item.id === saved.range)) state.range = saved.range;
+			if (MODES.some((item) => item.id === saved.mode)) state.mode = saved.mode;
+
+			const available = new Set(state.stats.repos.map((repo) => repo.name));
+			const kept = (Array.isArray(saved.names) ? saved.names : []).filter((name) => available.has(name));
+			if (kept.length) state.names = new Set(kept);
+		}
+
+		/* ------------------------------------------------------------ 渲染 */
+
+		function layout() {
+			const width = Math.max(320, Math.round(dom.plot.clientWidth || 960));
+			return { width, height: width < 620 ? 300 : 400 };
+		}
+
+		/** 当前窗口（每次重画都按它算，避免各处各算一份） */
+		function currentWindow() {
+			return windowFor(state.stats, state.range);
+		}
+
+		function setStatus(text, isError = false) {
+			dom.status.textContent = text;
+			dom.status.classList.toggle('is-error', isError);
+		}
+
+		/** 数据来源与新鲜度：本地时区显示，同时把 UTC 原文挂在 title 上 */
+		function renderStatus() {
+			const iso = state.stats.generatedAt;
+			const date = new Date(iso);
+			const pad = (value) => String(value).padStart(2, '0');
+			const local = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+			const ageHours = (Date.now() - date.getTime()) / 3_600_000;
+			const ageDays = Math.floor(ageHours / 24);
+			const isRecent = Boolean(findRange(state.range).hours);
+			const hasDetail = Boolean(state.stats.recentSince);
+
+			let hint = '';
+			if (isRecent && !hasDetail) hint = '（这份数据不含提交明细，近期窗口画不出来，请点「抓取最新」）';
+			else if (isRecent && ageHours > STALE_HOURS) hint = `（快照是 ${formatRelative(iso)} 的，看当下请点「抓取最新」）`;
+			else if (ageDays > STALE_DAYS) hint = `（快照已 ${ageDays} 天未更新，可点「抓取最新」）`;
+
+			/*
+			 * 本次请求花了多少也写出来：访客能自己判断「配额快没了」还是「几乎没花」，
+			 * 命中 304 的那些请求不扣配额，值得单独说明。
+			 */
+			const run = state.lastRun;
+			const cost = run
+				? ` · 本次 ${run.requests} 次请求${run.notModified ? `（${run.notModified} 次未变更，不计配额）` : ''}${
+						run.quota?.limit ? `，配额余 ${run.quota.remaining}/${run.quota.limit}` : ''
+					}`
+				: '';
+
+			setStatus(
+				`数据更新于 ${local}（本机时区）· ${formatRelative(iso)} · ${
+					state.live ? '浏览器实时抓取' : '页面内快照'
+				}${hint}${cost}`,
+			);
+			dom.status.title = `快照时间（UTC）：${iso}`;
+		}
+
+		function renderMetrics() {
+			const activeWindow = currentWindow();
+			const summary = summarize(state.stats, { names: [...state.names], range: state.range });
+
+			dom.metrics.get('commits').textContent = String(summary.commits);
+			dom.metrics.get('active').textContent = `${summary.activeRepos}/${summary.repos}`;
+			dom.metrics.get('peak').textContent = String(summary.peak?.value ?? 0);
+			dom.metrics.get('peakBucket').textContent = summary.peak?.tick ?? '—';
+			dom.metrics.get('repos').textContent = String(state.stats.repos.length);
+
+			dom.labels.get('peak').textContent = summary.peakLabel;
+			if (dom.activeHeader) dom.activeHeader.textContent = `活跃${summary.activeLabel}`;
+
+			dom.caption.textContent =
+				`窗口 ${summary.windowLabel} · 纵轴为${summary.bucketLabel}提交数` +
+				(activeWindow.kind === 'hours' ? ' · 时间轴为北京时间（UTC+8）' : ' · 每格一周（按 UTC 周日切分）') +
+				' · 点下方图例或表格行可开关对应曲线';
+		}
+
+		/** 口径按钮的文字跟着窗口粒度走：近 12 小时时叫「每小时提交」而不是「每周提交」 */
+		function renderModeLabels() {
+			const activeWindow = currentWindow();
+			for (const button of dom.modeButtons) button.textContent = modeLabel(activeWindow, button.dataset.ccMode);
+		}
+
+		function syncToolbar() {
+			for (const button of root.querySelectorAll('[data-cc-range]')) {
+				button.setAttribute('aria-pressed', button.dataset.ccRange === state.range ? 'true' : 'false');
+			}
+			for (const button of root.querySelectorAll('[data-cc-mode]')) {
+				button.setAttribute('aria-pressed', button.dataset.ccMode === state.mode ? 'true' : 'false');
+			}
+		}
+
+		/** 只重画曲线（图例保持不动，键盘焦点才不会丢） */
+		function drawChart() {
+			const { width, height } = layout();
+			dom.canvas.innerHTML = renderChart(state.stats, {
+				names: [...state.names],
+				range: state.range,
+				mode: state.mode,
+				width,
+				height,
+			});
+			hideTip();
+		}
+
+		function drawRows() {
+			dom.rows.innerHTML = renderRepoRows(state.stats, { names: [...state.names], range: state.range });
+		}
+
+		function drawAll() {
+			drawChart();
+			dom.legend.innerHTML = renderLegend(state.stats, { names: [...state.names], range: state.range });
+			drawRows();
+			renderMetrics();
+			renderModeLabels();
+			renderStatus();
+			syncToolbar();
+		}
+
+		/* -------------------------------------------------------------- 悬停 */
+
+		function toSvgPoint(svg, clientX, clientY) {
+			const matrix = svg.getScreenCTM();
+			if (!matrix) return null;
+			return new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+		}
+
+		function hideTip() {
+			const svg = dom.canvas.querySelector('.cc-svg');
+			svg
+				?.querySelector('.cc-crosshair')
+				?.setAttribute('style', 'stroke:var(--text-tertiary);stroke-width:1;stroke-dasharray:4 4;opacity:0');
+			svg?.querySelector('.cc-hover')?.replaceChildren();
+			dom.tip.hidden = true;
+		}
+
+		/** 当前选择下的曲线数据，悬停与重画共用同一套整形逻辑 */
+		function currentSeries() {
+			const activeWindow = currentWindow();
+			return [...state.names]
+				.map((name) => {
+					const index = state.stats.repos.findIndex((repo) => repo.name === name);
+					if (index < 0) return null;
+					return {
+						name,
+						color: chartColor(index),
+						values: windowValues(state.stats.repos[index], activeWindow, state.mode),
+					};
+				})
+				.filter(Boolean);
+		}
+
+		function onPointerMove(event) {
+			const svg = dom.canvas.querySelector('.cc-svg');
+			if (!svg) return;
+
+			const point = toSvgPoint(svg, event.clientX, event.clientY);
+			if (!point) return;
+
+			const [width, height] = svg
+				.getAttribute('viewBox')
+				.split(/\s+/)
+				.slice(2)
+				.map(Number);
+			const frame = chartLayout(width, height);
+			const activeWindow = currentWindow();
+			const { count, buckets } = activeWindow;
+			const index = indexAtX(frame, count, point.x);
+
+			const series = currentSeries();
+			const rawMax = series.reduce((max, item) => Math.max(max, ...item.values), 0);
+			const { maxY } = niceScale(rawMax);
+
+			const x = frame.pad.left + (count <= 1 ? frame.plotW / 2 : (frame.plotW * index) / (count - 1));
+			const crosshair = svg.querySelector('.cc-crosshair');
+			crosshair.setAttribute('x1', x.toFixed(1));
+			crosshair.setAttribute('x2', x.toFixed(1));
+			crosshair.setAttribute('style', 'stroke:var(--text-tertiary);stroke-width:1;stroke-dasharray:4 4;opacity:1');
+
+			svg.querySelector('.cc-hover').innerHTML = series
+				.map((item) => {
+					const value = item.values[index] ?? 0;
+					if (value <= 0) return '';
+					const y = frame.pad.top + frame.plotH * (1 - value / maxY);
+					return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${item.color}" style="stroke:var(--surface-1);stroke-width:1.5" />`;
+				})
+				.join('');
+
+			const rows = series
+				.map((item) => ({ name: item.name, color: item.color, value: item.values[index] ?? 0 }))
+				.filter((item) => item.value > 0)
+				.sort((a, b) => b.value - a.value);
+
+			const total = rows.reduce((sum, item) => sum + item.value, 0);
+			const bucket = buckets[index];
+			const modeHint = state.mode === 'cumulative' ? '（累计）' : '';
+
+			dom.tip.innerHTML =
+				`<p class="cc-tip__head">${escapeHtml(bucket?.span ?? '')}</p>` +
+				(rows.length
+					? `<ul class="cc-tip__list">${rows
+							.map(
+								(item) =>
+									`<li><span class="cc-tip__dot" style="background:${item.color}"></span>` +
+									`<span class="cc-tip__name">${escapeHtml(item.name)}</span>` +
+									`<span class="cc-tip__value">${item.value}</span></li>`,
+							)
+							.join('')}</ul>`
+					: `<p class="cc-tip__total">这${activeWindow.activeLabel === '周数' ? '周' : '一格'}没有提交</p>`) +
+				(rows.length
+					? `<p class="cc-tip__total"><span>合计${modeHint}</span><span class="cc-tip__value">${total}</span></p>`
+					: '');
+
+			dom.tip.hidden = false;
+
+			// 贴边时把浮层推回可视范围内
+			const plotWidth = dom.plot.clientWidth;
+			const tipWidth = dom.tip.offsetWidth;
+			const left = Math.min(
+				Math.max((x / width) * plotWidth, tipWidth / 2 + 2),
+				Math.max(plotWidth - tipWidth / 2 - 2, tipWidth / 2 + 2),
+			);
+			dom.tip.style.left = `${left}px`;
+		}
+
+		/* ------------------------------------------------------- 交互绑定 */
+
+		function toggle(name) {
+			if (state.names.has(name)) state.names.delete(name);
+			else state.names.add(name);
+
+			const on = state.names.has(name);
+			const button = dom.legend.querySelector(`[data-cc-repo="${CSS.escape(name)}"]`);
+			button?.classList.toggle('is-on', on);
+			button?.setAttribute('aria-pressed', on ? 'true' : 'false');
+
+			persist();
+			drawChart();
+			drawRows();
+			renderMetrics();
+		}
+
+		// 图表控件在卡片里、明细表的行在卡片外，用文档级委托一次覆盖两处
+		document.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof Element)) return;
+
+			const rangeButton = target.closest('[data-cc-range]');
+			if (rangeButton) {
+				state.range = rangeButton.dataset.ccRange;
+				persist();
+				drawAll();
+				return;
+			}
+
+			const modeButton = target.closest('[data-cc-mode]');
+			if (modeButton) {
+				state.mode = modeButton.dataset.ccMode;
+				persist();
+				drawAll();
+				return;
+			}
+
+			const legendButton = target.closest('.cc-legend__item[data-cc-repo]');
+			if (legendButton) {
+				toggle(legendButton.dataset.ccRepo);
+				return;
+			}
+
+			if (target.closest('[data-cc-refresh]')) {
+				refresh();
+				return;
+			}
+
+			// 表格行也能开关曲线；但点链接本身是去 GitHub，不要顺手改状态
+			const row = target.closest('tr[data-cc-repo]');
+			if (row && !target.closest('a')) toggle(row.dataset.ccRepo);
+		});
+
+		dom.plot.addEventListener('pointermove', onPointerMove);
+		dom.plot.addEventListener('pointerleave', hideTip);
+
+		let resizeTimer = 0;
+		let lastWidth = 0;
+		if ('ResizeObserver' in window) {
+			new ResizeObserver(() => {
+				const { width } = layout();
+				if (Math.abs(width - lastWidth) < 24) return;
+				lastWidth = width;
+				window.clearTimeout(resizeTimer);
+				resizeTimer = window.setTimeout(drawChart, 120);
+			}).observe(dom.plot);
+		}
+
+		/* --------------------------------------------------------- 抓取最新 */
+
+		async function refresh() {
+			if (state.busy) return;
+
+			// 十分钟内刚抓过：直接用本机那份，连条件请求都不发
+			const ageMinutes = (Date.now() - Date.parse(state.stats.generatedAt)) / 60000;
+			if (state.live && ageMinutes < REUSE_MINUTES) {
+				setStatus(
+					`本机这份是 ${Math.max(1, Math.round(ageMinutes))} 分钟前抓的，直接复用（没有发起任何请求）`,
+				);
+				return;
+			}
+
+			state.busy = true;
+			dom.refresh.disabled = true;
+			setStatus('正在从 GitHub 读取提交统计……');
+
+			const metrics = {};
+			const quota = { current: null };
+
+			try {
+				const fresh = await collectCommitStats(STATS_USER, {
+					/*
+					 * 这里**故意不传 token**：页面跑在访客浏览器里，任何凭据都会被打进产物。
+					 * 靠 ETag 条件请求省配额（304 不计费），需要更高配额请用服务端脚本或 Actions。
+					 */
+					cache: etagCache,
+					previous: state.stats,
+					metrics,
+					onQuota: (next) => {
+						quota.current = next;
+					},
+					onProgress: (message) => setStatus(message),
+				});
+
+				const available = new Set(fresh.repos.map((repo) => repo.name));
+				const kept = [...state.names].filter((name) => available.has(name));
+
+				state.stats = fresh;
+				state.live = true;
+				state.names = new Set(kept.length ? kept : defaultActiveNames(fresh, { range: state.range }));
+				state.lastRun = {
+					requests: metrics.requests ?? 0,
+					notModified: metrics.notModified ?? 0,
+					quota: quota.current,
+				};
+
+				try {
+					localStorage.setItem(LIVE_KEY, JSON.stringify(fresh));
+				} catch {
+					/* 存不下就只影响下次访问，当前这次照常显示 */
+				}
+
+				drawAll();
+			} catch (error) {
+				setStatus(`抓取失败：${error.message}。当前显示的仍是页面内快照。`, true);
+			} finally {
+				state.busy = false;
+				dom.refresh.disabled = false;
+			}
+		}
+
+		/* ------------------------------------------------------------ 启动 */
+
+		restore();
+		lastWidth = layout().width;
+
+		/*
+		 * 首屏已经有构建期画好的图（那同时也是禁用 JS 时的兜底），
+		 * 这里等浏览器画完一帧再重画一次：
+		 *   1. 按真实容器宽度 1:1 重排 —— 构建期只能按 960 宽的 viewBox 画，
+		 *      手机上整个缩放后 11px 的刻度字会小到看不清；
+		 *   2. 应用本机偏好与「抓取最新」缓存下来的那份数据。
+		 */
+		requestAnimationFrame(drawAll);
+	}
+</script>

@@ -81,7 +81,7 @@ async function requiredFromMenu(used) {
 }
 
 /** 独立页面（与 menu 里的 dedicated 节点对应） */
-const REQUIRED_PAGES = ['about/index.html', 'faq/index.html', 'tools/index.html'];
+const REQUIRED_PAGES = ['about/index.html', 'activity/index.html', 'faq/index.html', 'tools/index.html'];
 
 const { files: contentFiles, used: usedCategories } = readContent();
 

@@ -14,8 +14,11 @@ pnpm-debug.log*
 
 
 # environment variables
+# .env 里可能放 GitHub 令牌（scripts/gen-commit-stats.mjs 会读），绝不能提交
 .env
 .env.production
+.env.local
+.env.*.local
 
 # macOS-specific files
 .DS_Store

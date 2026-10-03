@@ -14,6 +14,7 @@
     "check:links": "node scripts/check-links.mjs",
     "check:wallpapers": "node scripts/check-wallpapers.mjs",
     "refresh:wallpapers": "node scripts/gen-wallpaper-manifest.mjs",
+    "refresh:commits": "node scripts/gen-commit-stats.mjs",
     "verify": "pnpm run build && pnpm run check:links"
   },
   "dependencies": {

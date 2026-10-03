@@ -22,6 +22,8 @@ const ICONS = {
 		'<rect x="4.5" y="3" width="15" height="18" rx="2.5"/><path d="M8.5 8h7"/><path d="M8.5 12h7"/><path d="M8.5 16h4"/>',
 	tools:
 		'<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="11" cy="17" r="2"/>',
+	// 折线图：一条带拐点的上升曲线压在坐标轴上
+	activity: '<path d="M4 19.5h16"/><path d="m6.5 15.2 3.6-4.4 3.2 2.5L19.5 6"/>',
 	faq: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.5"/><path d="M12 17.2h.01"/>',
 	about:
 		'<circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>',
@@ -105,6 +107,7 @@ export const MENU_DATA = [
 			{ label: '杂谈', path: 'misc' },
 		],
 	},
+	{ label: '项目提交', path: 'activity', icon: ICONS.activity, dedicated: true },
 	{ label: '工具', path: 'tools', icon: ICONS.tools, dedicated: true },
 	{ label: '常见问题', path: 'faq', icon: ICONS.faq, dedicated: true },
 	{ label: '关于', path: 'about', icon: ICONS.about, dedicated: true },

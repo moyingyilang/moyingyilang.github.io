@@ -10,6 +10,7 @@ Fluent 提供层级、强调条与 Acrylic 颗粒质感，MIUI 提供圆角尺�
 - 🔍 命令面板搜索（`Ctrl` / `⌘` + `K`，或按 `/`）
 - 🖼️ 图片点击放大灯箱、代码块一键复制、表格自适应滚动
 - 📄 文章集合自动汇总到分类页、RSS 与搜索索引
+- 📈 项目提交折线图：同作者各仓库从近 12 小时到近 52 周的提交曲线，可筛选项目、切换窗口与口径
 - ♿ 禁用 JS 时内容依然完整可见（入场动画有兜底降级）
 
 ## 目录结构
@@ -29,10 +30,14 @@ src/
 ├── config/menu.js            导航结构唯一数据源
 ├── content/blog/*.mdx        文章 / 文档正文
 ├── content.config.ts         文章集合 schema
+├── data/commit-stats.json    提交统计快照（由 pnpm refresh:commits 生成）
 ├── layouts/BaseLayout.astro  app-shell 栅格（顶栏 / 导航 / 正文 / 目录 / 页脚）
-├── pages/                    路由
+├── pages/                    路由（含 activity.astro 项目提交折线图）
 ├── styles/global.css         设计令牌与全部共享样式
-└── utils/posts.ts            取文章、排序、日期、阅读时长、分类解析
+└── utils/
+    ├── posts.ts              取文章、排序、日期、阅读时长、分类解析
+    ├── github-stats.js       GitHub 提交统计采集（构建脚本与浏览器共用）
+    └── commit-chart.js       折线图 / 图例 / 明细表渲染
 ```
 
 ## 写一篇文章
@@ -170,6 +175,79 @@ node scripts/gen-wallpaper-manifest.mjs
 > 只收录 `gallery` 与 `backgrounds`。其余图集为游戏场景与剧情素材。
 > 这些图源均为第三方，可用性与内容不由本站保证。
 
+## 项目提交折线图
+
+`/activity` 画的是本站作者（`@moyingyilang`）各公开仓库的提交曲线，窗口从近 12 小时到近 52 周。
+**两套粒度、两个数据源**：
+
+| 窗口 | 数据源 | 一格代表 |
+| --- | --- | --- |
+| 13 / 26 / 52 周 | `/repos/{owner}/{repo}/stats/participation` 的 52 个周桶 | 一周（UTC 周日切分） |
+| 7 天 / 3 天 / 1 天 / 12 小时 | `/repos/{owner}/{repo}/commits?author=…` 的提交时间戳现场切桶 | 6 / 3 / 1 小时 |
+
+两个口径都**只统计仓库拥有者本人的提交**，所以 fork 里上游作者的提交不会混进曲线
+（这也是一些 fork 项目曲线为 0 的原因）。近期窗口的时间轴按**北京时间（UTC+8）**对齐 ——
++8 没有夏令时，构建期与访客浏览器算出的格子完全一致，首屏不会跳变。
+两套数据来自不同接口，个别提交可能对不上（合并提交、rebase 的处理方式不同）。
+
+页面上可以切换窗口与口径（逐桶计数 / 窗口内累计）、按项目开关曲线（点图例或表格行）、
+悬停查看某一格的明细与合计，以及点「抓取最新」用访客自己的网络匿名请求一次 GitHub
+（一次约 20–40 次请求，匿名配额每小时 60 次），结果只写进本机 `localStorage`，不会上传到任何地方。
+
+### 数据快照
+
+页面内嵌的是一份**构建期快照** `src/data/commit-stats.json`，随仓库提交 ——
+访客打开就有图可看，不消耗配额，也不暴露自己的 IP：
+
+```sh
+pnpm refresh:commits                        # 匿名请求（60 次/小时/IP）
+GITHUB_TOKEN=ghp_xxx pnpm refresh:commits   # 带令牌（5000 次/小时）
+```
+
+`.github/workflows/refresh-commits.yml` 每 3 小时自动重跑一次上面这条命令并提交结果，
+用的是 Actions 自带的 `GITHUB_TOKEN`（1000 次/小时/仓库），**访客完全不必为这张图花配额**。
+数据没变化时脚本不写盘、workflow 也不提交，不会刷出一堆只有时间戳的提交。
+
+快照里有两份数据：`weeks`（52 个周桶）与每个仓库的 `recent`（近 14 天的提交时间戳，
+供小时级窗口切桶）。明细只为「最近推送过」的仓库抓取 —— 提交的 committer 时间不会晚于推送时间，
+所以 `pushed_at` 早于窗口起点的仓库不可能有落在窗口里的提交，个人账号里这一条能省掉一半请求。
+
+采集逻辑在 `src/utils/github-stats.js`：**构建期脚本与浏览器里的「抓取最新」共用同一份实现**，
+两边的口径不会漂移；单个仓库取不到统计时会跳过它而不是整轮失败。
+折线图渲染在 `src/utils/commit-chart.js`：同一套渲染函数既供构建期 `set:html` 出图
+（禁用 JS 时也是完整的图表 + 图例 + 明细表），也供运行期重画。
+
+### 配额怎么省、令牌给谁
+
+匿名调用 GitHub 是 **60 次/小时/IP**（而且同一出口 IP 下所有人共用），这是硬上限、无法申请提高。
+项目里做了四件事把开销压到最低：
+
+| 手段 | 效果 |
+| --- | --- |
+| ETag 条件请求（`If-None-Match`） | 数据没变时 GitHub 返回 304，**304 不计入速率限制**；缓存里只存 `URL → ETag` 一张小表，不存响应体 |
+| 命中 304 时复用上一份快照 | 省掉一份响应体缓存，`localStorage` 只占几 KB |
+| 只问「窗口内可能有提交」的仓库 | 没在 52 周内推送过的仓库不问周统计；没在 14 天内推送过的不问明细，个人账号里能省掉一半请求 |
+| 10 分钟内重复点「抓取最新」 | 直接复用本机那份，一次请求都不发 |
+
+真要更高配额，令牌有三条路，**都不进前端产物**：
+
+| 场景 | 令牌 | 配额 |
+| --- | --- | --- |
+| 本机刷新快照 | `GITHUB_TOKEN=… pnpm refresh:commits`，或写进 `.env`（已在 `.gitignore`） | 5000 次/小时 |
+| CI 定时刷新（推荐） | 无需配置，workflow 用自带的 `secrets.GITHUB_TOKEN` | 1000 次/小时/仓库 |
+| CI 想再高 | 加一个仓库 secret `SITE_STATS_TOKEN`（细粒度 PAT，权限只勾「公开仓库只读」） | 5000 次/小时 |
+
+令牌获取地址：classic 令牌 <https://github.com/settings/tokens>，细粒度令牌
+<https://github.com/settings/personal-access-tokens/new>（后者建议只给 Public repositories
+的只读权限、设个短过期时间；读公开数据不需要任何额外 scope）。
+
+> ⚠️ **令牌绝对不能进仓库、也不能进前端**。
+> 页面上的「抓取最新」跑在访客浏览器里，那里的代码一律公开：`authHeaders()` 刻意不去读
+> `process.env`，令牌只能由调用方显式传入，浏览器那条路径结构上就不会带凭据。
+> 公开仓库里出现令牌会被 GitHub 的密钥扫描直接吊销，而且历史记录里会留下痕迹
+> （AGPL 许可保护的是代码，**不保护凭据**）。
+> 真泄漏了：先去设置页吊销，再用 `git filter-repo` / BFG 重写历史并强推，同时检查 fork 与缓存里的残留。
+
 ## 命令
 
 | 命令 | 作用 |
@@ -182,6 +260,7 @@ node scripts/gen-wallpaper-manifest.mjs
 | `pnpm check:links` | 校验产物：关键文件、内部链接、搜索索引、图集清单 |
 | `pnpm check:wallpapers` | 检测壁纸图集直链是否失效（支持 `-- --sample 30`） |
 | `pnpm refresh:wallpapers` | 重新枚举游戏仓库文件名并覆盖图集清单 |
+| `pnpm refresh:commits` | 重新采集 GitHub 提交统计快照（`GITHUB_TOKEN=xxx` 可提高配额） |
 
 ### 维护脚本
 
@@ -284,6 +363,7 @@ CI 用 `withastro/action@v3`，它内部的 `pnpm/action-setup` 会在
 - 顶栏、侧边导航树、页脚与正文排版的重构
 - 可调壁纸系统：五种来源模式、设置面板、游戏图集清单生成脚本
 - 内容集合与路由修复、命令面板搜索、图片灯箱、回到顶部等交互
+- 项目提交折线图：GitHub 统计采集、快照生成脚本与自绘 SVG 折线图
 - 维护脚本（产物校验、图源失效检测）与依赖、CI 配置排查
 
 参与形式：**DeepSeek Harness**（模型 `deepseek-flash`），担任 AI 编程助手。
