@@ -1,0 +1,220 @@
+---
+title: 105 个 Compose 组件：抄什么，不抄什么
+description: 把 105 个 @Composable 分成三层再谈移植策略，附必须逐位照抄的设计 token 表；顺带记下 typographyOf 少覆盖的四个字号、五个最难复刻的组件，以及三处不该照抄的死代码与两处注释不一致。
+date: 2026-10-06
+category: projects
+tags:
+  - Compose
+  - Qt
+  - 设计系统
+  - 组件
+---
+
+> 口径：数字来自对 `app/src/main/kotlin/com/jmnext/ui/` 的全量扫描与逐行核对。只写源码里实际存在的东西；读不到的不编，标「未确认」。
+
+## 1. 先把 105 分成三层
+
+当成一张 105 行的待办清单，工作量会被严重高估。正确读法是先分层。
+
+| 层 | 数量 | 位置 | 移植策略 |
+| --- | --- | --- | --- |
+| A 设计系统核心 | 23 | `ui/components/`、`ui/` 根、`ui/theme/` | 1:1 复刻，不合并、不顺手优化 |
+| B 屏幕级 public | 27 | `ui/screens/**` | 18 个页面入口各做一次；只挑 9 个真跨屏的 |
+| C 屏幕内 private | 55 | 各屏幕文件内部 | 跟着所属屏幕走，不跨屏抽象 |
+| 合计 | 105 | | |
+
+统计边界：`ui/` 里 `@Composable` 注解命中 130 处，差额是 `content: @Composable () -> Unit` 这类 lambda 类型标注。
+
+### 1.1 A 类 23 个：一个都不能走样
+
+调用点密度：`GlassSurface` 32 处，`GlassTopBar` 18 处，`ErrorBox` 17 处，`MessageState` 15 处，`LoadingBox` 14 处，`LoadMoreFooter` 9 处。
+
+这层承载「风格切换」的全部语义——页面代码不知道自己跑在哪套风格下，分支只出现在这几个组件内部。任何一个走样，五套风格同时走样。其中 `jmShape(radius)` 与 `JmTheme` 是入口而非组件。
+
+### 1.2 B 类 27 个：只有 9 个值得跨屏
+
+另外 18 个是页面入口（`HomeScreen`、`DetailScreen`、`ReaderScreen`…），各自只被路由调用一次。
+
+| 组件 | 复用理由 |
+| --- | --- |
+| `RandomFab` / `DailyQuickFab` | 首页骰子与签到按钮，一个压在另一个上方 52dp |
+| `DailyHistorySection` | 签到历史，折叠时不发请求 |
+| 4 个 `Folder*Dialog` | 新建 / 重命名 / 删除 / 选择 / 管理收藏夹 |
+| `ChapterPickerDialog` | 每页 10 话，打开定位当前话 |
+| `TagPickerDialog` | 标签多选后一次提交 |
+
+判断依据：调用点多于一处，或同一语义在两个页面出现。不满足就不提升。
+
+### 1.3 C 类 55 个：跟着屏走
+
+只在本文件被调用，但 Qt 里仍要重建。分布：
+
+| 屏幕文件 | 数量 | 代表 |
+| --- | --- | --- |
+| profile | 14 | `SettingCard`、`StyleOption`、`EntryButton` |
+| reader | 10 | `ReaderBottomBar`、`ReaderImage`、`PageFallback` |
+| search | 6 | `SuggestionPanel`、`WordChips`、`FilterRow` |
+| category | 4 | `CategoryChipRow`、`CategoryGrid`、`TagBlocks` |
+| detail / about / notifications | 各 3 | `DetailHeader`、`InfoCard`、`NotificationCard` |
+| home / more / creator / settings | 各 2 | `HomeContent`、`ChipRow`、`AuthorCard`、`BlockSection` |
+| week / comments / favorites / random | 各 1 | `ChipRow`、`CommentCard`、`FolderRow`、`Hint` |
+| tags | 0 | 列表项直接写在页面函数体里 |
+
+两个反例：`ChipRow` 在 `week/` 与 `more/` 各有一份同名实现（没提升为公共组件）；`notifications/Box16` 名字叫 16 但实际画 8dp 圆点。Qt 侧照抄行为，别照抄名字。
+
+## 2. 设计 token 照抄表
+
+数值都要求逐位一致。五套风格 × 深浅 × 二十多个字段是两百多个数值，手抄必错；配色（四套，Material 走 M3 角色）与其中三套的圆角已经用脚本从 `Tokens.kt` / `Palettes.kt` 机械抽出生成 Qt 侧表，间距、字号、动效还没进生成器。
+
+### 2.1 间距：4dp 基准栅格
+
+| 令牌 | 值 | 使用次数 | 令牌 | 值 | 使用次数 |
+| --- | --- | --- | --- | --- | --- |
+| `Spacing.xxs` | 2dp | 23 | `Spacing.lg` | 16dp | 93 |
+| `Spacing.xs` | 4dp | 71 | `Spacing.xl` | 24dp | 2 |
+| `Spacing.sm` | 8dp | 97 | `Spacing.xxl` | 32dp | 7 |
+| `Spacing.md` | 12dp | 59 | | | |
+
+### 2.2 圆角：五套 + 一个写死的胶囊
+
+| 风格 | xs | sm | md | lg | xl |
+| --- | --- | --- | --- | --- | --- |
+| WindowGlass | 2 | 4 | 6 | 8 | 12 |
+| Translucent | 2 | 4 | 6 | 8 | 12 |
+| Miuix | 4 | 8 | 12 | 16 | 24 |
+| Material | 4 | 8 | 12 | 12 | 28 |
+| FlatBlur | 8 | 12 | 16 | 20 | 28 |
+
+- Translucent 是 `windowGlass.copy`，圆角没改，数值与 WindowGlass 完全一致。
+- `Radius.pill = 999.dp` 写死，与风格无关，且**不走 `jmShape`**，直接用 `RoundedCornerShape(percent = 50)`。
+- 唯一分支：Miuix（`SurfaceCraft.Card`）把每个 `jmShape(r)` 换成连续圆角 `SquircleShape(r)`。
+- 使用频次：pill 11、md 11、sm 10、xs 7、lg 6。
+
+### 2.3 字号：五套 TypeScale（单位 sp）
+
+| 风格 | display | title | subtitle | body | label | caption | lineHeightFactor |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| WindowGlass | 28 | 20 | 16 | 15.5 | 13 | 11.5 | 1.72 |
+| Translucent | 28 | 20 | 16 | 15.5 | 13 | 11.5 | 1.72 |
+| Miuix | 30 | 22 | 16 | 15 | 13.5 | 12 | 1.45 |
+| Material | 28 | 22 | 16 | 16 | 14 | 11 | 1.50 |
+| FlatBlur | 28 | 21 | 16 | 15 | 13 | 11.5 | 1.60 |
+
+全部 `FontFamily.Default`。注释明确写了「刻意不指定字体族」，Qt 侧同样用平台原生字体栈。字重另有 `titleWeight` / `subtitleWeight` / `bodyWeight` 随风格变。
+
+### 2.4 动效：三个基准、两套性格
+
+基准时长来自 `Motion`：`FAST = 120`、`BASE = 200`、`SLOW = 320`（毫秒）。
+
+| 风格 | fast | base | slow | springy |
+| --- | --- | --- | --- | --- |
+| WindowGlass / Translucent | 120 | 200 | 320 | false |
+| Miuix | 150 | 240 | 360 | true |
+| Material | 100 | 200 | 300 | false |
+| FlatBlur | 120 | 220 | 320 | false |
+
+与风格正交的性格覆盖两套：
+
+| 性格 | fast | base | slow | enter | exit |
+| --- | --- | --- | --- | --- | --- |
+| Plasma | 150 | 250 | 420 | outCubic | inCubic |
+| HyperOS | 200 | 350 | 500 | hyperOS | hyperOSOut |
+
+八条缓动曲线就是 Qt 的 `QEasingCurve::BezierSpline`：
+
+| 曲线 | 控制点 | 曲线 | 控制点 |
+| --- | --- | --- | --- |
+| standard | 0.33, 0, 0.67, 1 | decel | 0.1, 0.9, 0.2, 1 |
+| fluent | 0.16, 1, 0.3, 1 | outCubic | 0.215, 0.61, 0.355, 1 |
+| inCubic | 0.55, 0.055, 0.675, 0.19 | inOutQuad | 0.455, 0.03, 0.515, 0.955 |
+| hyperOS | 0.35, 0, 0.10, 1 | hyperOSOut | 0.5, 0, 0.30, 1 |
+
+### 2.5 图标：只有一套，47 个
+
+只有 Material Icons Extended 一个来源，实际出现 47 个不同图标（`ArrowBack` 14 次最多）。**没有任何自定义绘制图标**：`ui/` 下 `ImageVector.Builder` 0 处，`Path()` 只出现在 `Shapes.kt` 里画圆角轮廓。Qt 侧按名字换成 Material Symbols；`Icons.AutoMirrored.*` 要按 `LayoutDirection` 手动镜像。
+
+## 3. 一处真实缺口：`typographyOf` 只覆盖 6 个槽位
+
+它只定义了 `displaySmall`、`titleLarge`、`titleMedium`、`bodyLarge`、`bodyMedium`、`labelSmall`，但实际被用到的有 9 个：
+
+| M3 槽位 | 使用次数 | 被覆盖 | M3 槽位 | 使用次数 | 被覆盖 |
+| --- | --- | --- | --- | --- | --- |
+| `labelSmall` | 104 | 是 | `titleLarge` | 5 | 是 |
+| `bodyMedium` | 28 | 是 | `titleSmall` | 3 | 否 |
+| `bodyLarge` | 16 | 是 | `labelLarge` | 2 | 否 |
+| `titleMedium` | 14 | 是 | `labelMedium` | 1 | 否 |
+| `bodySmall` | 11 | 否 | `displaySmall` | 0 | 是（没人用） |
+
+覆盖了 6 个，其中 1 个 0 使用；实际用的 9 个里有 4 个没被覆盖。`bodySmall` / `titleSmall` / `labelLarge` / `labelMedium` 落回 material3 库默认 `Typography`，本仓库没有写死任何数值——清点时因此不给数字。
+
+移植时两条路都行：按当前 `TypeScale` 补定义，或照抄库默认。**唯一不能做的是假装已经覆盖了**。否则症状是「切风格时大部分文字跟着变，这四个字号不动」，很难归因到 typography。
+
+## 4. 最难复刻的五个
+
+### 4.1 `GlassSurface`
+
+难在它是一处分五种工艺的总分支：`Acrylic` / `Glass` / `Blur` / `Card` / `Tonal`，叠加 3 档层级、`tinted` 开关（只有 Acrylic 与 Glass 真画橙蓝薄层）、通透模式（填充 alpha 乘 0.08）、按压缩放。绘制链是 shadow → clip → background → 强调色薄染 → 橙到蓝对角渐变 → 发丝描边 → 64×64 噪点平铺（`BlendMode.Overlay`）→ 上缘高光；真背景模糊只在 API 31+ 由 `RenderEffect` 实现，且只糊整块底。
+
+Qt 拆法：填充、描边、对角薄染走 QSS；上缘高光、强调色薄染、颗粒、环境底、投影自绘，颗粒正好对应 `drawTiledPixmap` 加 `CompositionMode_Overlay`。逐表面的 `backdrop-filter` 主项目自己也没做到（注释自述 Compose 读不到已绘制内容），Widgets 无法采样兄弟控件、QML 也做不到递归采样——不列为目标，只做它现有的近似：模糊整块底图 + 半透明填充。
+
+### 4.2 `SquircleShape`
+
+超椭圆（指数 5、每角 12 段）逐点构造轮廓，`createOutline` 返回通用 Path。45 度处到角心约 0.86r，圆弧是 0.707r——肉眼能看出差别的正是这个位置。注释还记了一笔：曾反向扫角导致少填约 9.46% 面积。
+
+Qt 的 QSS 与 `QRect::roundedRect` 都表达不了，必须 `QPainterPath`（`cubicTo` 或采样 `lineTo`），并保证顶点顺序不自交。影响面只有 Miuix 一套风格，所以可以最后做：先铺圆弧圆角，超椭圆留作 Miuix 的收尾项。
+
+### 4.3 `Modifier.jmSharedElement`
+
+依赖 `SharedTransitionLayout` 的 overlay 渲染，语义是「按触发前后的矩形插值，且原位置留空缺」；配套 `jmVanishWhenLeaving()` 在退出时立刻隐藏本页，只留封面在飞；由 `LocalSharedElementEnabled` 总开关控制。
+
+Qt 没有等价机制。拆开看本质是「在覆盖层上把封面从矩形 A 插值画到 B」——`QVariantAnimation` 插值 `QRect` 加 `drawPixmap(targetRect, pm)`，自绘与覆盖层正好擅长。要在页面层另建的是「原位置留空缺」与退出瞬隐这两条状态语义。顺序上先有覆盖层与页面转场框架，再谈封面飞行。
+
+### 4.4 `FloatingBottomBar`
+
+胶囊位置是一个连续 Float（单位是「第几栏」，可为小数），可拖动、松手吸附。拖动期间 `lift` 从 0 到 1：指示器放大 `1 + 0.04 × lift`，图标放大 `1 + 0.08 × weight × lift`，颜色是 `lerp(textSecondary, accent, weight)`；拖动与吸附各一套弹簧参数。四个纯函数 `clampPill` / `nearestTab` / `tabIndexAt` / `tabSelectionWeight` 可单测。
+
+Qt Widgets 侧弹簧手感要自己写数值积分器，解析曲线 `QEasingCurve` 只能近似过冲；QML 的 `SpringAnimation` 一行就有同样的物理参数化。所以这也是「要不要引入一层 QML」的决策点。可以先做贴底版 `DockedBottomBar`，它不是难点。
+
+### 4.5 `ReaderImage` / `PageFallback`
+
+四件事叠在一起：三档比例回退（`byUrl` → `byAlbum` → `placeholderRatio`，连续滚动传 0.72）、每页实测比例回写 LRU（`byUrl` 上限 600、`byAlbum` 上限 16、可信区间 0.1 到 2.5）、预取窗口（基准 full 为 2 / 8、lite 为 1 / 3，再按自学习深度缩放到 1 到 12）、反切片解码（页号取 `fileNameStem`，重试时换 memoryCacheKey）。
+
+卡人的是一条隐性约束：**预取与显示必须用完全相同的请求**。缓存键由请求本身决定，预取少一个转换，存下的就是另一份东西，用户滚到时仍要重新下载，预取等于白做。Qt 侧因此要把「页号、aid、scrambleId、重试档位」全部纳入缓存键重新设计，不能只按 URL。现状是内存 LRU 存成品、磁盘存未还原原始字节，预取也已可用；差的是键体系与反切片参数入键。另一个机会是把「解码 + 还原」合并成一次操作，省掉两次整页拷贝。
+
+## 5. 不该抄的东西
+
+### 5.1 三个 0 调用点的组件
+
+| 组件 | 位置 | 实际状态 |
+| --- | --- | --- |
+| `GlassCircle` | `ui/components/Glass.kt:262` | 全仓库 0 处调用 |
+| `Modifier.accentBar` | `ui/components/Glass.kt:247` | 0 处调用（左侧 MIUI 强调条） |
+| `NoticeHost` | `ui/Notices.kt:61` | app 模块内 0 处调用，已被 Material3 的 `SnackbarHost` 取代 |
+
+前两个可以做但不急；`NoticeHost` 直接不要做——照着已被替代的实现复刻，只会得到一份新的死代码。
+
+### 5.2 九个死令牌
+
+「已定义但读点为零」的令牌有九个：
+
+| 令牌 | 声明值 | 令牌 | 声明值 |
+| --- | --- | --- | --- |
+| `Glass.blurRadius` | 40dp | `Sizing.minTouch` | 48dp |
+| `Glass.innerHighlight` | 1dp | `ElevationBase`（sm/card/flyout） | 2 / 6 / 12 dp |
+| `Glass.TINT_ANGLE_DEG` | 120f | `Motion.FADE_ONLY` | 80 |
+| `Sizing.hairline` | 1dp | `JmEasing.decel`、`JmEasing.inOutQuad` | 两条曲线 |
+
+实际生效的是别的字段：描边宽度读 `SurfaceSpec.hairline`，投影读 `SurfaceSpec.shadows`，模糊由用户壁纸设置决定。`Glass.blurRadius` 尤其典型——测试类注释自己承认过「以前 blur 令牌是死值，声明了 40dp 却没有任何地方读它」。照抄它们不只是无用，还会让人误以为它们管着某个视觉结果。另外几处 import 是遗留的（`DownloadDone` 全文未引用；`Logout` / `MenuBook` / `DriveFileMove` 的非 AutoMirrored 版本），也不要抄。
+
+### 5.3 两处注释与代码不一致
+
+| 位置 | 注释写的 | 代码实际 |
+| --- | --- | --- |
+| `MotionSpec.asPlasma()` | 取自 Kirigami 的 longDuration 200ms、veryLongDuration 400ms | 150 / 250 / 420 |
+| `SurfaceSpec.backdropSaturate` 相关注释 | 「模糊加到 64dp」 | 代码里没有任何 64dp；模糊只由用户壁纸设置决定，风格只提供饱和度补偿 |
+
+第一条照抄代码。第二条更有意思：风格表里根本没有 blur 字段，这是有意设计——**风格不该覆盖用户对壁纸模糊的显式选择**。Qt 侧照这个归属做，不要给风格加模糊半径。
+
+## 6. 收尾
+
+A 类 23 个逐位复刻，B 类只提升 9 个，C 类 55 个跟着屏走；token 表照抄数值、别照抄注释；四个缺口的字号要么补要么认；五个最难组件里有两个（超椭圆、真背景模糊）可以先不做，另外三个要等 Qt 的覆盖层、弹簧积分器与图片缓存键三件事定下来。骨架屏 / shimmer 在主项目里不存在——Qt 要加属于新增，不是复刻。

@@ -1,0 +1,181 @@
+---
+title: QSS、自绘与 QML 的移植边界
+description: 逐条清点 42 项 Compose 效果与动画在 Qt 上的可行性：QSS 只够 8 项，25 项必须自绘，4 项只有 QML 能做，4 项四个栈都做不到。
+date: 2026-10-06
+category: projects
+tags:
+  - Compose
+  - Qt
+  - 自绘
+  - 动效
+---
+
+上一篇清点了组件与屏级结构。这一篇只看两件事：**表面工艺（效果）** 和 **动画**。
+
+清点对象是一个 Compose Multiplatform 手机应用，42 项判断（效果 23 项 + 动画 19 项），逐条带 `文件:行号` 与可行性结论。
+目标侧是 Qt 桌面重实现，当前只 `find_package(Qt6 COMPONENTS Widgets)`，界面目录 `src/qt/`，**还没有 Qt Quick**。
+
+判断口径只有四个字母，每行只给一个：
+
+| 字母 | 含义 |
+| --- | --- |
+| (a) | Qt Widgets + QSS 能表达 |
+| (b) | Qt Widgets + QPainter 自绘能表达（QSS 不够） |
+| (c) | Qt Quick / QML 更合适或必须 |
+| (d) | 四个栈都做不到 |
+
+## 一、先说结论
+
+| 判断 | 条数 | 占比 |
+| --- | --- | --- |
+| (b) QPainter 自绘 | 25 | 60% |
+| (a) QSS | 8 | 19% |
+| (c) QML | 5 | 12% |
+| (d) 四栈都做不到 | 4 | 9% |
+
+两句话：
+
+- 这套视觉里**绝大多数东西是「自绘」的，不是「Qt 特性」的**。(b) 占 25/42，QSS 只够撑纯色、描边、单层渐变。
+- (c) 有 5 项，但严格说「Widgets 侧纯自绘也不现实」的只有 **4 项**；剩下 1 项（页面整屏横滑）只是 QML 更省事，不是不能做。
+
+## 二、最反直觉的一处：它没有用真 OS 模糊
+
+我最初的判断是错的。我以为桌面端要复刻那层玻璃质感，就得去接 Windows 的 DWM 亚克力（`DwmSetWindowAttribute`），Linux 侧基本没戏。
+
+实际读源码之后发现：**这个 Compose 应用压根没做真的 OS 亚克力 / 背景模糊**。它的玻璃是自绘模拟的：
+
+| 层 | 做法 | 出处 |
+| --- | --- | --- |
+| 环境底 | 线性渐变（`backdrop` 色，0,0 → 0.35w,h）+ 三团径向光斑 | `ui/components/AmbientBackdrop.kt:152-201` |
+| 高清颗粒 | 64×64 确定性伪随机位图，`TileMode.Repeated` 平铺，`BlendMode.Overlay`，alpha 0.5 | `ui/components/Glass.kt:194-214,305-339` |
+| 半透明表面 | `surface1/2/3` 的 alpha 再乘 `fillAlphaScale` | `ui/components/Glass.kt:116-120,133-134` |
+| 发丝描边 | 1dp `border`，浅色 `0x170F172A` / 深色 `0x1AFFFFFF` | `ui/components/Glass.kt:188-189` |
+| 上缘高光 | 高 3×hairline 的竖向渐变条 | `ui/components/Glass.kt:216-226` |
+
+更关键的一条：**模糊只作用于「应用自己画的底图」**。
+
+源码注释自己写着：Compose 读不到「已绘制内容」再作模糊，所以真正的背景模糊交给 AmbientBackdrop 的 RenderEffect 完成，
+表面上的 blur 值只是**协议**（`ui/components/Glass.kt:79-81`、`Tokens.kt:86-98`）。
+
+也就是说，连它自己也没做成「逐表面 backdrop-filter」——只有「整块底」被模糊过一次。
+顺带一提，风格表里根本没有 blur 字段：风格只提供饱和度补偿倍数，不得覆盖用户对壁纸模糊半径的显式选择。
+
+**这条发现的价值在工程量上**：桌面端不需要 DWM、不需要 OS 模糊、不需要平台分支。
+把底图（渐变 + 壁纸 + 光斑）**CPU 预模糊一次并缓存**，各表面按自己的矩形裁剪、再叠半透明填充与描边，观感就能对齐。
+用户拖动模糊滑块时按档重算一次缓存，不是每帧重算。
+
+## 三、42 项的分布长什么样
+
+### 3.1 为什么 QSS 只有 8 项
+
+先记住 QSS 的能力边界，下面的判断全靠它：
+
+| QSS 能 | QSS 不能 |
+| --- | --- |
+| `rgba(...)` 半透明背景 | `box-shadow`（没有投影） |
+| `border` + `border-radius` | 任何 `blur` / `backdrop-filter` / `filter` |
+| `qlineargradient` / `qradialgradient` 多 stop | `transform` / `scale` / `rotate` |
+| 字体、padding、margin | `transition` / `animation`（QSS 不实现 CSS 动画） |
+| （普通 QWidget 需 `WA_StyledBackground` 或 QFrame 子类） | 混合模式（Overlay 等）、超椭圆圆角、文字阴影 |
+
+于是「一个控件只能有一层 `background`」这一条，直接把所有多层叠色的效果推给了自绘。
+
+### 3.2 各类的代表条目
+
+| 判断 | 代表条目 | 为什么落在这类 |
+| --- | --- | --- |
+| (a) | 半透明填充、发丝描边、橙→蓝对角薄染、壁纸遮罩、通透模式开关、Material 色调分层、表面三档层级、莫奈上色层 | 都是「一层半透明色 / 一条多 stop 渐变 / 换个 alpha 乘数」，QSS 表达力刚好够 |
+| (b) | 上缘高光、Acrylic 颗粒、背景模糊、饱和度补偿、环境底三光斑、投影三档、超椭圆圆角、按压缩放、文字反色柔光、图片淡入、共享元素飞行 | 要叠第二层、要混合模式、要混合半径、要变换、要逐帧插值，QSS 全无 |
+| (c) | 三个弹簧动效 + 列表条目增删位移 + 页面整屏横滑 | 见下一节 |
+| (d) | 系统栏图标明暗、真逐表面模糊、动态取色、系统级预测性返回 | 见下下节 |
+
+(b) 里有几个值得单独点出来的：
+
+| 条目 | 自绘对应物 | 备注 |
+| --- | --- | --- |
+| Acrylic 颗粒 | `drawTiledPixmap` + `CompositionMode_Overlay` + `setOpacity(0.5)` | 与 Compose 的 `BlendMode.Overlay`、`alpha = 0.5f` 一一对应 |
+| 超椭圆圆角（n=5，每角 12 段） | `QPainterPath`（`cubicTo` 或采样 `lineTo`） | QSS 的 `border-radius` 与 `QRect::roundedRect` 都表达不了 |
+| 饱和度补偿 | 自己对 `QImage` 做色彩矩阵 / HSV 换算 | Qt 没有现成饱和度滤镜，`QGraphicsColorizeEffect` 是染色不是饱和 |
+| 投影三档 | `QGraphicsDropShadowEffect` 或自绘模糊阴影 | 实际值只有 0/1/3/6 dp，三档可切 |
+
+## 四、只有 QML 能做的 4 项
+
+严格口径：**Widgets 侧即使全部自绘也不现实**。全部是动画。
+
+| 项 | Compose 侧写法 | 为什么 Widgets 只能近似 |
+| --- | --- | --- |
+| 表面按压缩放 | `spring(dampingRatio = 0.55f, stiffness = 900f)`，0.97 ↔ 1.0 | 缺的是**物理弹簧**语义，不是缩放 |
+| 胶囊底栏吸附 | `spring(dampingRatio = 0.72f, stiffness = 420f)`（另一路 1f / 300f） | 拖动中要 `snapTo` 跟手，松手吸附要与同一个连续量接上 |
+| 胶囊拖起放大 | `spring(dampingRatio = 0.45f, stiffness = 900f)`，1.0 → 1.04 | 同上的弹簧参数化 |
+| 列表条目增删 / 位移 | `animateItem()`（Compose Foundation 默认 spec） | `QListView/QListWidget` **没有条目级增删与位移动画**，只有滚动动画 |
+
+前 3 项的差距具体在哪：
+
+| 能力 | Qt Widgets | Qt Quick / QML |
+| --- | --- | --- |
+| 缓动 | `QEasingCurve`：解析式曲线（`OutBack` 只能**近似**过冲） | `SpringAnimation`：`spring` / `damping` 物理参数 |
+| 阻尼比 / 刚度参数 | 无 | 有（直接对应 `dampingRatio` / `stiffness`） |
+| 拖动中跟手 + 松手吸附共用一个连续量 | 自己接手势 + 写数值积分器 | `Behavior on x { SpringAnimation {} }` 一行 |
+| 列表条目级 transition | 无；要自写布局差量 → 逐条动画 → 复用回收 | `ListView` 内建 `add` / `remove` / `move` / `displaced` |
+
+第 4 项的代价要说清楚：自绘列表从零做「布局差量 → 逐条动画 → 回收复用」，等于重写一个列表控件。
+能写，但那已经不是「用 Qt 的动画系统」，而是在 Qt 里重实现 Compose 的 `LazyColumn` 差值算法。
+
+## 五、四个栈都做不到的 4 项
+
+这几项我不会假装做到。
+
+| 项 | 为什么四个栈都做不到 |
+| --- | --- |
+| 真·逐表面背景模糊 | 主项目自己也没做到（源码注释自述读不到已绘制内容）；QSS 无此概念；QWidget 的 QPainter **无法采样兄弟控件的绘制结果**；QML 的 `ShaderEffectSource` 只能抓显式引用的 item，做不了「本层之下所有半透明兄弟层」的递归采样 |
+| 动态取色（Monet → M3 全套颜色角色） | 四栈都没有「从壁纸推导一整套颜色角色」的 API。Qt 只给明暗 `QStyleHints::colorScheme()`，Windows 只给一个 accent，Linux 各桌面走 portal |
+| 系统栏图标明暗 | 平台行为。Android 要 `WindowInsetsController`（JNI），Windows 要 DWM，Linux 各桌面接口不同，四栈本身都不提供 |
+| 系统级预测性返回跟手 | **输入源不存在**：桌面三平台没有「系统级预测性返回手势 + 窗口预览进度」。淡出本身能自绘，但那一项单独不存在 |
+
+E22 那一条的可行替代，就是它现在已经在用的近似：**模糊整块底图 + 半透明表面填充**。这部分 (b) 可行。
+
+附注一条不属于这四栈、但要如实记的：**真 OS Acrylic / Mica**（取窗口**之后**的其它窗口与桌面内容）四个栈都做不到，需要 Win32 调用。
+但主项目用的不是它，所以这条**不构成移植阻塞**。
+
+## 六、我原本判断错的三处
+
+诚实是这篇的重点，所以单列一节。
+
+| 我原来的判断 | 实际 | 代价 |
+| --- | --- | --- |
+| 玻璃质感要靠 DWM / OS 模糊 | 它是自绘模拟，模糊只对自建底图生效 | 我差点为一个不存在的需求引入平台分支 |
+| QSS 能覆盖大半表面效果 | 只有 8/42，纯色与单层渐变之外全要自绘 | 样式表方案从一开始就得放弃大半 |
+| 自绘 25 项是坏消息 | 反而是好消息：自绘可控、可缓存、可位图对账 | 真正的风险集中在 4 项动画，而不是 25 项效果 |
+
+第三条值得展开：一位 QPainter 自绘的表面，其数值（alpha、圆角、描边色、渐变 stop）都能和源码里的常量逐条对上，
+也能离屏渲染出图做像素比对。相比之下，「弹簧手感」这种没有解析解的东西，才对不上账。
+
+## 七、工程结论：混合方案
+
+结论不是「全 Widgets」也不是「全 QML」，而是**主体自绘 + 局部内嵌 QML**。
+
+| 部分 | 选择 | 理由 |
+| --- | --- | --- |
+| 窗口、布局、文本、列表容器、阅读器 | Qt Widgets | CJK 断行与字体回退最成熟，控件与输入稳定 |
+| 表面工艺（填充/描边/高光/颗粒/阴影/超椭圆） | QPainter 自绘 | 25 项 (b) 的落点；数值可与源码常量逐条对账 |
+| 底图模糊与饱和度 | QPainter 预模糊 + 缓存裁剪 | 模糊对象是自己画的底图，半径 0..24dp，按档重算一次 |
+| 4 项弹簧/条目动画 | `QQuickWidget` 内嵌 QML | 只在这几处引入 Qt Quick，不把整个界面搬到 QML |
+
+接口边界也要定死：C++ 侧只往 QML 传少量量——按压状态、胶囊目标索引、缩放目标值、条目增删事件——动画本身留在 QML 里。
+这样 QML 只是一个「手感部件」，不承担布局与业务。
+
+### 一个版本约束：Qt 6.4 没有 MultiEffect
+
+`QtQuick.Effects` 的 `MultiEffect`（blur / shadow / saturation / mask）要 **Qt 6.5+**。6.4 只能走 `Qt5Compat.GraphicalEffects`
+（`GaussianBlur` / `DropShadow` / `Blend`），或者自己写 `ShaderEffect`。
+
+于是有一条容易被忽略的结论：**在 Qt 6.4 上「为了模糊而用 QML」收益极低**——模糊该自绘还是得自绘，
+而 QML 那 4 项动画的价值与版本无关。选 QML 是为了**弹簧手感**，不是为了模糊。
+
+### 还没验证的部分
+
+- `QQuickWidget` 与 Widgets 混用时，透明背景、z-order、输入焦点与滚动联动还没实测（当前仓库是骨架阶段，Qt 侧界面只有 `MainWindow.cpp` 等）。
+- 全屏底图模糊的**单次耗时**没有实测数据；只能确定它不在每帧路径上，可缓存。
+- 超椭圆（n=5、每角 12 段）用 `QPainterPath` 采样的性能与观感，也未与 Compose 侧做过像素比对。
+
+以上三条按「未验证」记档，等 Qt 工具链装好、有真实渲染帧之后再补。
