@@ -5,7 +5,7 @@ import { ANIME_SOURCES, GAMES, MODES, clientConfig } from '../config/wallpapers'
  * 壁纸引擎与「外观设置」面板
  *
  * 只把元数据序列化给客户端脚本（游戏图集的实际图片直链在
- * public/wallpaper-manifest.json 里按需加载，避免把 474 条 URL 内联进每个页面）。
+ * public/wallpaper-manifest.json 里按需加载，避免把 568 条 URL 内联进每个页面）。
  */
 const config = clientConfig();
 const configJson = JSON.stringify(config).replace(/</g, '\\u003c');

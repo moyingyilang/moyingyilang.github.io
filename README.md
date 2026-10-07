@@ -26,9 +26,11 @@ src/
 │   ├── SearchPalette.astro   搜索面板
 │   ├── ThemeToggle.astro     深浅色切换
 │   ├── SiteScripts.astro     全部客户端交互（集中挂载，避免重复绑定）
+│   ├── Wallpaper.astro       可调壁纸（五种来源模式与设置面板）
+│   ├── WhaleEgg.astro        彩蛋
 │   └── Footer.astro          页脚与社交链接
 ├── config/menu.js            导航结构唯一数据源
-├── content/blog/*.mdx        文章 / 文档正文
+├── content/blog/*.{md,mdx}   文章 / 文档正文
 ├── content.config.ts         文章集合 schema
 ├── data/commit-stats.json    提交统计快照（由 pnpm refresh:commits 生成）
 ├── layouts/BaseLayout.astro  app-shell 栅格（顶栏 / 导航 / 正文 / 目录 / 页脚）
@@ -138,7 +140,7 @@ node scripts/gen-wallpaper-manifest.mjs
 （整个仓库通常 1MB 以内，不下载任何图片），再用 `git ls-tree` 列出文件名 ——
 这样**不受 GitHub API 匿名配额（60 次/小时）限制**，实测配额被用尽后这条路仍然可用。
 
-已接入的图集（每个最多收录 100 张，共 474 条直链）：
+已接入的图集（每个最多收录 100 张，共 568 条直链）：
 
 | 图集 | 仓库内总数 | 分辨率（抽样） |
 | --- | --- | --- |
@@ -147,8 +149,10 @@ node scripts/gen-wallpaper-manifest.mjs
 | 明日方舟 · 场景背景 | 518 | 1024x576 |
 | 碧蓝航线 · 画廊 | 480 | 1024x576 ~ 4091x2316 |
 | 碧蓝航线 · 背景 | 74 | 1024x576 ~ 1920x1080 |
+| 通用动漫 · 竖屏（Wallhaven） | 按筛选条件取前 100 | 1080x1920 起 |
+| 通用动漫 · 横屏（Wallhaven） | 按筛选条件取前 100 | 1920x1080 起 |
 
-清单是构建时的一次性快照，55KB，仅在壁纸来源包含游戏图集时按需请求，
+清单是构建时的一次性快照，约 60KB，仅在壁纸来源包含游戏图集时按需请求，
 **不会内联进页面**（内联的只有约 2KB 的元数据）。链接失效时重新运行脚本即可。
 
 ### 已实测可用 / 不可用
@@ -265,11 +269,11 @@ GITHUB_TOKEN=ghp_xxx pnpm refresh:commits   # 带令牌（5000 次/小时）
 ### 维护脚本
 
 `scripts/check-links.mjs` 在构建之后校验 `dist/`：
-关键产物是否齐全（13 项）、所有内部 `href` 能否解析到真实文件、
+关键产物是否齐全（52 项）、所有内部 `href` 能否解析到真实文件、
 `search-index.json` 与 `wallpaper-manifest.json` 是否可解析且非空。
 有问题时退出码为 1，可直接用作 CI 门禁。
 
-`scripts/check-wallpapers.mjs` 逐个探测 474 条图集直链（只取前 1KB），
+`scripts/check-wallpapers.mjs` 逐个探测 568 条图集直链（只取前 1KB），
 用来发现第三方图源腐坏。图集链接失效时重新跑 `refresh:wallpapers` 即可。
 
 ## 部署
