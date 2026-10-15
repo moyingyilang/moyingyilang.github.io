@@ -1,6 +1,6 @@
 {
 	"user": "moyingyilang",
-	"generatedAt": "2026-10-15T16:54:55.998Z",
+	"generatedAt": "2026-10-15T21:19:02.368Z",
 	"weeks": [
 		"2025-10-19",
 		"2025-10-26",
@@ -55,7 +55,7 @@
 		"2026-10-04",
 		"2026-10-11"
 	],
-	"recentSince": "2026-10-01T16:54:49.868Z",
+	"recentSince": "2026-10-01T21:18:55.678Z",
 	"repos": [
 		{
 			"name": "moyingyilang.github.io",
@@ -69,7 +69,7 @@
 			"fork": false,
 			"archived": false,
 			"createdAt": "2025-06-14T18:09:44Z",
-			"pushedAt": "2026-10-15T11:21:15Z",
+			"pushedAt": "2026-10-15T16:54:56Z",
 			"noStats": false,
 			"noRecent": false,
 			"weekly": [
@@ -1191,9 +1191,7 @@
 				1,
 				0
 			],
-			"recent": [
-				"2026-10-01T17:14:24Z"
-			]
+			"recent": []
 		},
 		{
 			"name": "NT-s_Website_Next",
