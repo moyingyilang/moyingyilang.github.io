@@ -27,6 +27,8 @@ const ICONS = {
 	faq: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.5"/><path d="M12 17.2h.01"/>',
 	about:
 		'<circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>',
+	efml4a:
+		'<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M12 12 4 7.5"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/>',
 };
 
 /**
@@ -107,6 +109,7 @@ export const MENU_DATA = [
 			{ label: '杂谈', path: 'misc' },
 		],
 	},
+	{ label: 'EFML4A', path: 'EFML4A', icon: ICONS.efml4a, dedicated: true },
 	{ label: '项目提交', path: 'activity', icon: ICONS.activity, dedicated: true },
 	{ label: '工具', path: 'tools', icon: ICONS.tools, dedicated: true },
 	{ label: '常见问题', path: 'faq', icon: ICONS.faq, dedicated: true },

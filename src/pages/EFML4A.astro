@@ -1,0 +1,326 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getSortedPosts, postHref, readingTime } from '../utils/posts';
+
+/**
+ * EFML4A 专题页。
+ *
+ * 研究文档按 01–40 编号收录在 src/content/blog/（category: reverse）。
+ * 这一页不复制正文，只做「项目介绍 + 全部文档索引」：
+ * 阅读路径、阶段划分与仓库入口都收敛在这里，免得在分类列表里翻 40 篇。
+ */
+
+const DOCS_REPO = 'https://github.com/moyingyilang/EFML4A-docs';
+const MAIN_REPO = 'https://github.com/moyingyilang/EFML4A';
+const REPACK_REPO = 'https://github.com/moyingyilang/EFML4A-repack';
+const GUI_REPO = 'https://github.com/moyingyilang/EFML4A-gui';
+
+/** 从 efml4a-NN-xxx 里取编号；`efml4a-summary` 返回 Infinity，排到最后 */
+function docNumber(id) {
+	const match = id.match(/^efml4a-(\d+)/);
+	return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
+}
+
+const posts = await getSortedPosts();
+const docs = posts
+	.filter((post) => post.id.startsWith('efml4a-'))
+	.sort((a, b) => docNumber(a.id) - docNumber(b.id) || a.id.localeCompare(b.id));
+
+const numbered = docs.filter((post) => Number.isFinite(docNumber(post.id)));
+const summary = docs.filter((post) => !Number.isFinite(docNumber(post.id)));
+
+/** 阶段划分按文档编号，与私有仓库的轮次记录对齐 */
+const PHASES = [
+	{ label: '立项、对标与路线选型', hint: '问题定义 · EFMI 解剖 · 四条路线 · 威胁模型 · 格式规范', from: 1, to: 12 },
+	{ label: '真机验证与注入链路', hint: '真实 mod 剖析 · 隐式层 · zygisk-loader · 密钥与内存', from: 13, to: 21 },
+	{ label: 'VFS 索引与提取', hint: 'FVFBlockFileInfo · XXE1 · 全量提取闭环 · 可行性裁定', from: 22, to: 27 },
+	{ label: '资产格式与首次成功', hint: 'EFMI .buf · 基线 · 阶段交接 · 模型确实变了', from: 28, to: 32 },
+	{ label: '工具链与 1.6.4 迁移', hint: 'C 工具集 · 版本更新 · 结构变化 · 补丁加密 · 部署验证', from: 33, to: 40 },
+];
+
+const groups = PHASES.map((phase) => ({
+	...phase,
+	posts: numbered.filter((post) => {
+		const n = docNumber(post.id);
+		return n >= phase.from && n <= phase.to;
+	}),
+})).filter((group) => group.posts.length > 0);
+
+const TOOL_COUNT = 20;
+---
+
+<BaseLayout
+	title="EFML4A"
+	description="Arknights: Endfield Mod Loader for Android —— 项目介绍与全部技术文档索引。VFS/.ab 容器逆向、Unity 压缩 Mesh、EFMI 资产格式与纯 C 工具链。"
+>
+	<nav class="breadcrumbs" aria-label="面包屑">
+		<a href="/">首页</a>
+		<span class="sep" aria-hidden="true">/</span>
+		<span aria-current="page">EFML4A</span>
+	</nav>
+
+	<div class="page-head">
+		<p class="page-head__eyebrow">研究项目 · Android · 逆向工程</p>
+		<h1 class="page-title">EFML4A</h1>
+		<p class="page-desc">
+			<strong>Arknights: Endfield Mod Loader for Android</strong> —— 在 Android 上做
+			《明日方舟：终末地》的换模型 mod 加载器。这里收录项目的全部技术文档，
+			以及从零写出来的分析工具链。
+		</p>
+	</div>
+
+	<div class="efml-stats">
+		<div class="efml-stat">
+			<span class="efml-stat__num">{docs.length}</span>
+			<span class="efml-stat__label">篇技术文档</span>
+		</div>
+		<div class="efml-stat">
+			<span class="efml-stat__num">{TOOL_COUNT}</span>
+			<span class="efml-stat__label">个自研工具</span>
+		</div>
+		<div class="efml-stat">
+			<span class="efml-stat__num">1.6.4</span>
+			<span class="efml-stat__label">实测游戏版本</span>
+		</div>
+		<div class="efml-stat">
+			<span class="efml-stat__num">100%</span>
+			<span class="efml-stat__label">纯 C / 无 Python</span>
+		</div>
+	</div>
+
+	<section class="prose efml-intro">
+		<h2>这是什么</h2>
+		<p>
+			PC 上的「换模型」mod 生态已经成熟了十几年：3DMigoto 用一个代理 DLL 劫持 Direct3D，
+			在图形 API 边界把游戏要画的顶点/索引缓冲换掉；
+			<a href="https://github.com/SpectrumQT/EFMI-Package" rel="noopener" target="_blank">EFMI</a>
+			是这条脉络上针对《终末地》的最新实现。
+		</p>
+		<p>
+			<strong>这套东西在 Android 上无法直接搬运</strong>：没有 DXGI，图形栈是 Vulkan / GLES；
+			进程隔离 + SELinux 让注入需要 root；目标是活跃运营的 Unity 游戏，
+			资源封装在 VFS 容器里，还有版本更新与完整性校验。
+		</p>
+		<p>
+			EFML4A 回答的就是这个问题：<strong>Android 上应该怎么做？</strong>
+			结论是放弃「图形 API 代理」的直觉，转向 <strong>容器格式逆向 + 等长替换</strong>
+			这条离线路径，并把过程完整记录下来。
+		</p>
+
+		<h2>已经确证的技术结论</h2>
+		<ul>
+			<li>
+				<strong>VFS 索引（<code>.blc</code>）</strong>：ChaCha20（<code>nonce</code> = 前 12 字节，
+				<code>counter</code> = 1）+ 尾部 CRC32；<code>codeVersion &gt; 3</code> 时 tag 是
+				<strong>8 字节</strong>——公开工具只读 4 字节，因此对 1.6.4 全部失效。
+			</li>
+			<li>
+				<strong><code>.ab</code> 容器</strong>：48 字节混淆头 + 混淆块表（10 字节/块，混合字节序）
+				+ 节点表 + LZ4Inv 数据块，读/写逆公式均已验证。
+			</li>
+			<li>
+				<strong>AES 层</strong>：自研 VFSAES 的 CBC-like keystream <strong>加密 = 解密</strong>
+				（对合），写入路径因此大幅简化。
+			</li>
+			<li>
+				<strong>压缩</strong>：LZ4Inv（token 隔位 + 大端 offset），自研压缩器与游戏解压器
+				<strong>0 字节差异</strong>。
+			</li>
+			<li>
+				<strong>Unity Mesh</strong>：顶点是压缩格式（<code>m_Compression</code> /
+				<code>m_PackedBitVector</code>），这就是「模型换了但扭曲」的根因。
+			</li>
+		</ul>
+
+		<h2>边界</h2>
+		<p>
+			只做外观替换，<strong>不改</strong>数值、经济、掉落、战斗结果；
+			<strong>不用于</strong>竞技作弊；<strong>不散布</strong>游戏资源；
+			<strong>不实现</strong> ACE / 反作弊绕过。所有改动均为等长替换，可随时还原。
+		</p>
+	</section>
+
+	<section class="efml-repos">
+		<h2 class="section-heading">代码与工具</h2>
+		<div class="grid grid--2">
+			<a class="card card--link reveal" href={DOCS_REPO} target="_blank" rel="noopener">
+				<span class="card__arrow">↗</span>
+				<h3 class="card__title">EFML4A-docs</h3>
+				<p class="card__desc">
+					公开文档与工具源码：10 篇节选文档 + {TOOL_COUNT} 个 C11 工具，
+					<code>make</code> 一键构建，不含密钥与游戏资源。
+				</p>
+				<p class="card__meta"><span class="badge">public</span><span>GitHub</span></p>
+			</a>
+			<a class="card card--link reveal" href={MAIN_REPO} target="_blank" rel="noopener">
+				<span class="card__arrow">↗</span>
+				<h3 class="card__title">EFML4A</h3>
+				<p class="card__desc">
+					主研究仓：路线评估、格式逆向、逐轮实验记录与安卓侧骨架。
+				</p>
+				<p class="card__meta"><span class="badge badge--muted">private</span><span>GitHub</span></p>
+			</a>
+			<a class="card card--link reveal" href={REPACK_REPO} target="_blank" rel="noopener">
+				<span class="card__arrow">↗</span>
+				<h3 class="card__title">EFML4A-repack</h3>
+				<p class="card__desc">
+					拆出的 VFS / <code>.ab</code> 解析与重建库，纯 C11，LGPL-3.0，便于其他项目复用。
+				</p>
+				<p class="card__meta"><span class="badge badge--muted">private</span><span>GitHub</span></p>
+			</a>
+			<a class="card card--link reveal" href={GUI_REPO} target="_blank" rel="noopener">
+				<span class="card__arrow">↗</span>
+				<h3 class="card__title">EFML4A-gui</h3>
+				<p class="card__desc">
+					GUI / TUI 前端（C++ / C#），依赖 repack 的解析能力。
+				</p>
+				<p class="card__meta"><span class="badge badge--muted">private</span><span>GitHub</span></p>
+			</a>
+		</div>
+	</section>
+
+	<section class="efml-docs">
+		<h2 class="section-heading">全部技术文档</h2>
+		<p class="efml-docs__hint">
+			共 {docs.length} 篇，按研究阶段排列。每篇都可以单独读，链接会跳到对应文章。
+		</p>
+
+		<div class="post-groups">
+			{groups.map((group) => (
+				<section class="post-group">
+					<h3 class="section-heading post-group__head">
+						{group.label}
+						<span class="post-group__count">{group.posts.length} 篇</span>
+					</h3>
+					<p class="efml-phase-hint">{group.hint}</p>
+
+					<div class="stack">
+						{group.posts.map((post, index) => (
+							<a
+								class="card reveal"
+								href={postHref(post)}
+								style={`transition-delay:${Math.min(index * 35, 200)}ms`}
+							>
+								<span class="card__arrow">→</span>
+								<h4 class="card__title">{post.data.title}</h4>
+								{post.data.description && <p class="card__desc">{post.data.description}</p>}
+								<p class="card__meta">
+									<span>{readingTime(post.body)}</span>
+									{(post.data.tags ?? []).slice(0, 3).map((tag) => (
+										<span class="badge badge--muted">{tag}</span>
+									))}
+								</p>
+							</a>
+						))}
+					</div>
+				</section>
+			))}
+
+			{summary.length > 0 && (
+				<section class="post-group">
+					<h3 class="section-heading post-group__head">
+						总览
+						<span class="post-group__count">{summary.length} 篇</span>
+					</h3>
+					<p class="efml-phase-hint">全部结论的索引版，适合先读这一篇</p>
+					<div class="stack">
+						{summary.map((post) => (
+							<a class="card reveal" href={postHref(post)}>
+								<span class="card__arrow">→</span>
+								<h4 class="card__title">{post.data.title}</h4>
+								{post.data.description && <p class="card__desc">{post.data.description}</p>}
+								<p class="card__meta"><span>{readingTime(post.body)}</span></p>
+							</a>
+						))}
+					</div>
+				</section>
+			)}
+		</div>
+	</section>
+</BaseLayout>
+
+<style>
+	/* 关键数字：四列统计条，窄屏两列 */
+	.efml-stats {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.8rem;
+		margin: 1.6rem 0 2.4rem;
+	}
+
+	.efml-stat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		padding: 0.9rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md, 12px);
+		background: var(--surface);
+	}
+
+	.efml-stat__num {
+		font-size: 1.35rem;
+		font-weight: 650;
+		letter-spacing: -0.02em;
+		color: var(--accent);
+	}
+
+	.efml-stat__label {
+		font-size: 0.8rem;
+		color: var(--text-tertiary);
+	}
+
+	@media (max-width: 640px) {
+		.efml-stats {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	.efml-intro {
+		margin-bottom: 2.6rem;
+	}
+
+	.efml-repos,
+	.efml-docs {
+		margin-top: 2.6rem;
+	}
+
+	.efml-docs__hint,
+	.efml-phase-hint {
+		font-size: 0.86rem;
+		color: var(--text-tertiary);
+	}
+
+	.efml-docs__hint {
+		margin: -0.2rem 0 1.2rem;
+	}
+
+	.efml-phase-hint {
+		margin: -0.4rem 0 0.2rem;
+	}
+
+	/* 与文章列表页保持一致的组间距 */
+	.post-groups {
+		display: flex;
+		flex-direction: column;
+		gap: 2.4rem;
+	}
+
+	.post-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+
+	.post-group__head {
+		justify-content: flex-start;
+	}
+
+	.post-group__count {
+		margin-left: auto;
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 450;
+		color: var(--text-tertiary);
+	}
+</style>
