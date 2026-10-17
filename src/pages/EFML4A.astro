@@ -36,6 +36,10 @@ const PHASES = [
 	{ label: 'VFS 索引与提取', hint: 'FVFBlockFileInfo · XXE1 · 全量提取闭环 · 可行性裁定', from: 22, to: 27 },
 	{ label: '资产格式与首次成功', hint: 'EFMI .buf · 基线 · 阶段交接 · 模型确实变了', from: 28, to: 32 },
 	{ label: '工具链与 1.6.4 迁移', hint: 'C 工具集 · 版本更新 · 结构变化 · 补丁加密 · 部署验证', from: 33, to: 40 },
+	{ label: '运行时 Hook 与反篡改', hint: 'Vulkan hook · 完整性校验 · 反篡改 · 九次崩溃复盘 · 多路径发散', from: 41, to: 48 },
+	{ label: 'VFS 写入链路', hint: '.ab 容器 · .blc 结构 · 写回成功 · 可见性验证', from: 49, to: 56 },
+	{ label: '闭环与可见化', hint: '内存命中 · 屏幕可见 · 压缩器 v4 · 原目标写入 · 图案验证', from: 57, to: 62 },
+	{ label: '完整性与启动加载', hint: '清单分析 · 启动分组 · 流光偏移 · vktex 观测 · 被跳过的纹理', from: 63, to: 69 },
 ];
 
 const groups = PHASES.map((phase) => ({
