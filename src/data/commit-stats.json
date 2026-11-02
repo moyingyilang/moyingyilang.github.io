@@ -1,6 +1,6 @@
 {
 	"user": "moyingyilang",
-	"generatedAt": "2026-11-02T00:38:25.462Z",
+	"generatedAt": "2026-11-02T10:55:36.452Z",
 	"weeks": [
 		"2025-11-09",
 		"2025-11-16",
@@ -55,7 +55,7 @@
 		"2026-10-25",
 		"2026-11-01"
 	],
-	"recentSince": "2026-10-19T00:38:19.380Z",
+	"recentSince": "2026-10-19T10:55:28.572Z",
 	"repos": [
 		{
 			"name": "moyingyilang.github.io",
@@ -69,7 +69,7 @@
 			"fork": false,
 			"archived": false,
 			"createdAt": "2025-06-14T18:09:44Z",
-			"pushedAt": "2026-11-01T19:37:11Z",
+			"pushedAt": "2026-11-02T00:38:26Z",
 			"noStats": false,
 			"noRecent": false,
 			"weekly": [
@@ -212,7 +212,7 @@
 			"homepage": "https://moyingyilang.github.io/",
 			"description": "JMComic rewritten with kotlin,Stability and simplicity are paramount.",
 			"language": "Kotlin",
-			"stars": 2,
+			"stars": 3,
 			"forks": 1,
 			"fork": false,
 			"archived": false,
