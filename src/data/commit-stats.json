@@ -1,6 +1,6 @@
 {
 	"user": "moyingyilang",
-	"generatedAt": "2026-11-03T16:59:39.596Z",
+	"generatedAt": "2026-11-03T23:15:50.239Z",
 	"weeks": [
 		"2025-11-09",
 		"2025-11-16",
@@ -55,7 +55,7 @@
 		"2026-10-25",
 		"2026-11-01"
 	],
-	"recentSince": "2026-10-20T16:59:32.860Z",
+	"recentSince": "2026-10-20T23:15:44.524Z",
 	"repos": [
 		{
 			"name": "moyingyilang.github.io",
@@ -69,7 +69,7 @@
 			"fork": false,
 			"archived": false,
 			"createdAt": "2025-06-14T18:09:44Z",
-			"pushedAt": "2026-11-03T06:40:44Z",
+			"pushedAt": "2026-11-03T16:59:41Z",
 			"noStats": false,
 			"noRecent": false,
 			"weekly": [
@@ -126,13 +126,7 @@
 				0,
 				0
 			],
-			"recent": [
-				"2026-10-20T22:18:21Z",
-				"2026-10-20T22:18:21Z",
-				"2026-10-20T22:18:21Z",
-				"2026-10-20T22:18:21Z",
-				"2026-10-20T22:18:21Z"
-			]
+			"recent": []
 		},
 		{
 			"name": "dsh-termux-toolkit",
@@ -593,10 +587,7 @@
 				19,
 				0
 			],
-			"recent": [
-				"2026-10-20T22:11:32Z",
-				"2026-10-20T22:16:27Z"
-			]
+			"recent": []
 		},
 		{
 			"name": "EFML4A-docs",
