@@ -16,27 +16,39 @@ tags:
 
 完整清单在 [termux-env-archive/TROUBLESHOOTING.md](https://github.com/moyingyilang/termux-env-archive/blob/main/TROUBLESHOOTING.md)，这里挑的是最有代表性的。
 
-## 一、aapt2 是 x86-64 的
+## 一、aapt2 的架构问题
 
+先纠正一个流传很广的过时结论：**「aapt2 必须 x86-64、所以要装转译层」是错的**。本机 `build-tools/35.0.1`、`36.0.0` 里的 aapt2/aidl 实测都是 aarch64，`d8` 更是 jar，本来就跨架构。
+
+但也不能因此以为不用配置——**AGP 默认从 Maven 下载 x86_64 的 aapt2，无视本地 SDK**。这两件事要分开看：本地二进制是 ARM 的，AGP 用的却不是本地那份。
+
+所以判定顺序是：先看本地架构，再决定要不要覆盖。
+
+```bash
+od -An -tx1 -j18 -N2 "$SDK/build-tools/36.0.0/aapt2"   # b700 = aarch64，3e00 = x86_64
 ```
-aapt2: Exec format error
-```
 
-AGP 会从 Maven 拉 `linux-x86_64` 的 aapt2。在 ARM 设备上它连启动都做不到，报错形式取决于调用方式，有时是 shell 语法错误，很容易被误判成脚本写错。
-
-修法是指向本地 build-tools 里的 ARM 版本：
+确认是 ARM 之后，让 AGP 用本地这份：
 
 ```properties
 android.aapt2FromMavenOverride=/path/to/android-sdk/build-tools/35.0.1/aapt2
 ```
 
-配套还有一条：**aarch64 + arm64 aapt2 下，AGP 的资源优化会产出空资源表**——APK 能编出来，但里面没有 `AndroidManifest.xml` 与 `resources.arsc`，装不上。
+配套还有两条容易漏的：
+
+**一是 `aidl: 1: Syntax error: "(" unexpected` 这句不是语法错。** 它是内核 ENOEXEC（x86_64 二进制在 ARM 上执行不了）之后，shell 退而把二进制当脚本解析的典型表现。用同一条 `od` 查架构即可判定。
+
+**二是别在设备上走 `externalNativeBuild`。** SDK 自带的 cmake 也是 linux-x86_64 的 ELF，报的是 `cmake: 1: Syntax error ")" unexpected`。官方 NDK 只发 x86_64 宿主工具，这条路在本机不存在；改用 Termux 的 clang 预编译 `.so` 放进 `jniLibs`。
+
+顺带一条反直觉的：**在 AGP 里开 SDK Manager 更新，会把手工换进去的 ARM 二进制覆盖回 x86_64**。所以换过一次就该留个校验脚本。
+
+还有一个相关的构建坑：**aarch64 + arm64 aapt2 下，AGP 的资源优化会产出空资源表**——APK 能编出来，但没有 `AndroidManifest.xml` 与 `resources.arsc`，装不上。
 
 ```properties
 android.enableResourceOptimizations=false
 ```
 
-代价是 APK 不再裁剪无用资源，体积略大。这个交换是值得的：装不上的包体积再小也没意义。
+代价是不再裁剪无用资源，体积略大。这个交换值得：装不上的包体积再小也没意义。
 
 ## 二、容器里的 `/dev/null` 不可写
 
@@ -59,7 +71,11 @@ mknod -m 666 "$S/dev/random"  c 1 8
 mknod -m 666 "$S/dev/urandom" c 1 9
 ```
 
-这件事只能靠"先探测再修"固化下来，否则下次重启又会踩。我把它写进了进容器脚本：先 `echo probe > /dev/null`，失败才重建。
+但要注意：这套只能救 `/dev/null`。**`/dev/urandom` 即使建出节点也读不了**——SELinux 禁止从 app 域读设备节点，root 同样被拒；本机实测 `/dev/null` 可写、`/dev/urandom` 读取是 `Permission denied`。
+
+要跑依赖随机数的 glibc 程序（`std::random_device` 这类），得 `LD_PRELOAD` 一个 shim 拦截 `open/openat`，把这两个路径换成 `memfd_create` + `getrandom()` 预填的 fd，约 40 行 C。
+
+这件事只能靠「先探测再修」固化下来，否则下次重启又会踩。我把它写进了进容器脚本：先 `echo probe > /dev/null`，失败才重建。
 
 顺带两条容器常识，但很容易忘：
 
