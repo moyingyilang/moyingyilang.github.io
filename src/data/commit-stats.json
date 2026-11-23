@@ -1,6 +1,6 @@
 {
 	"user": "moyingyilang",
-	"generatedAt": "2026-11-23T01:37:34.816Z",
+	"generatedAt": "2026-11-23T12:22:18.341Z",
 	"weeks": [
 		"2025-11-30",
 		"2025-12-07",
@@ -55,7 +55,7 @@
 		"2026-11-15",
 		"2026-11-22"
 	],
-	"recentSince": "2026-11-09T01:37:27.528Z",
+	"recentSince": "2026-11-09T12:22:09.888Z",
 	"repos": [
 		{
 			"name": "moyingyilang.github.io",
@@ -69,7 +69,7 @@
 			"fork": false,
 			"archived": false,
 			"createdAt": "2025-06-14T18:09:44Z",
-			"pushedAt": "2026-11-22T19:30:29Z",
+			"pushedAt": "2026-11-23T01:37:35Z",
 			"noStats": false,
 			"noRecent": false,
 			"weekly": [
@@ -972,7 +972,7 @@
 			"homepage": null,
 			"description": "为百度学生手机的DuerOS进行优化与去百度控制化的模块及软件",
 			"language": "Shell",
-			"stars": 1,
+			"stars": 2,
 			"forks": 0,
 			"fork": false,
 			"archived": false,
