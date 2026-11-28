@@ -27,6 +27,8 @@ const ICONS = {
 	faq: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.5"/><path d="M12 17.2h.01"/>',
 	about:
 		'<circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/>',
+	support:
+		'<path d="M12 20.2 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z"/>',
 	efml4a:
 		'<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M12 12 4 7.5"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/>',
 };
@@ -114,6 +116,7 @@ export const MENU_DATA = [
 	{ label: '工具', path: 'tools', icon: ICONS.tools, dedicated: true },
 	{ label: '常见问题', path: 'faq', icon: ICONS.faq, dedicated: true },
 	{ label: '关于', path: 'about', icon: ICONS.about, dedicated: true },
+	{ label: '赞助支持', path: 'support', icon: ICONS.support, dedicated: true },
 ];
 
 /**
