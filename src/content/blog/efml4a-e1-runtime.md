@@ -340,4 +340,4 @@ clang -O2 -fPIC -shared -nostdlib -o libefml4a_xxx.so payload-xxx.c
 - ✅ 知道为什么不靠截图验证
 
 如果你想知道游戏为什么跳过你改的文件，读
-**[C2 · 阻塞与失败记录](C2-blockers.md)** —— 那篇就是用 vktex 发现的。
+**[C2 · 阻塞与失败记录](/blog/efml4a-c2-blockers/)** —— 那篇就是用 vktex 发现的。

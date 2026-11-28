@@ -256,7 +256,7 @@ dataStart = 48 + align16(compBI)
 只要 `compBI` 的变化不跨越 16 字节边界，`dataStart` 就不变。
 所以某些情况下 `compBI` 可以变而布局仍然合法。
 
-**但 —— 游戏不认。见 [C2](C2-blockers.md)。**
+**但 —— 游戏不认。见 [C2](/blog/efml4a-c2-blockers/)。**
 
 ### 5.2 数据块的编码
 
@@ -337,4 +337,4 @@ ls -l /tmp/stream.bin
 - ✅ 读懂 `abverify` 的输出
 - ✅ 理解为什么改内容会改变 `compBI`
 
-接着读 **[A3 · 加密体系](A3-crypto.md)** —— 那层 VFSAES 是怎么回事。
+接着读 **[A3 · 加密体系](/blog/efml4a-a3-crypto/)** —— 那层 VFSAES 是怎么回事。

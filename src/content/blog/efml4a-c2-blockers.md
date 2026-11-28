@@ -213,7 +213,7 @@ LZ4Inv 的流可以在末尾追加「纯字面量 token」
 
 ## 8. 下一步
 
-如果你想接着做，读 **[E1 · zygisk payload 与 vktex](E1-runtime.md)** ——
+如果你想接着做，读 **[E1 · zygisk payload 与 vktex](/blog/efml4a-e1-runtime/)** ——
 那篇讲怎么在运行时动手，是三条候选路里最有希望的方向。
 
-如果你想看这个项目走过哪些弯路，读 **[F1 · 历史与已证伪路线](F1-history.md)**。
+如果你想看这个项目走过哪些弯路，读 **[F1 · 历史与已证伪路线](/blog/efml4a-f1-history/)**。

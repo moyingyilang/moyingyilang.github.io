@@ -229,5 +229,5 @@ cd tools/vfs && make
 - ✅ 能读懂 `vfsfull` 的输出
 - ✅ 知道去哪里找某个资源的偏移和长度
 
-接着读 **[A2 · `.ab` 容器格式](A2-ab-container.md)** ——
+接着读 **[A2 · `.ab` 容器格式](/blog/efml4a-a2-ab-container/)** ——
 你会看到那 9,806 字节里面又套了一层混淆。

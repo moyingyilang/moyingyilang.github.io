@@ -1,6 +1,6 @@
 # 路遥起森的博客
 
-基于 Astro 6 的静态文档站，视觉基调是 **Fluent（Windows 11 Acrylic / Mica）× MIUI（miuix）毛玻璃**：
+基于 Astro 7 的静态文档站，视觉基调是 **Fluent（Windows 11 Acrylic / Mica）× MIUI（miuix）毛玻璃**：
 Fluent 提供层级、强调条与 Acrylic 颗粒质感，MIUI 提供圆角尺度、留白与橙→蓝渐变玻璃。
 
 ## 特性

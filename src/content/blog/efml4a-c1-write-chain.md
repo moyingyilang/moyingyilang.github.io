@@ -19,7 +19,7 @@ tags:
 **为什么重要**
 这是「动手」的那一篇。7 个步骤，命令可以照着敲。
 
-**⚠️ 前置条件：** 先读 [A5](A5-textures.md)，你要知道改哪个纹理、它的流偏移是多少。
+**⚠️ 前置条件：** 先读 [A5](/blog/efml4a-a5-textures/)，你要知道改哪个纹理、它的流偏移是多少。
 
 ---
 
@@ -73,7 +73,7 @@ CAB-ea25e5a9....resS  9792  累计前=14768
 
 **没有 `.resS` 的（内嵌）⇒ `streamOffset = 0`**
 
-**⚠️ 这一步错了后面全错。** 详细说明见 [A5 第 3 节](A5-textures.md)。
+**⚠️ 这一步错了后面全错。** 详细说明见 [A5 第 3 节](/blog/efml4a-a5-textures/)。
 
 ---
 
@@ -203,7 +203,7 @@ su -c "am start -n com.hypergryph.endfield/com.u8.sdk.U8UnityContext"
 
 **如果一切正常：** 游戏能启动、不崩溃、不报错。
 
-**⚠️ 但纹理可能还是不显示** —— 原因见 [C2](C2-blockers.md)。
+**⚠️ 但纹理可能还是不显示** —— 原因见 [C2](/blog/efml4a-c2-blockers/)。
 
 ---
 
@@ -259,4 +259,4 @@ su -c "md5sum '$VD/0CE8FA57/A47587BA5EEF7FD05F1FEC103DEA85BD.chk'"
 
 ## 下一步
 
-读 **[C2 · 阻塞与失败记录](C2-blockers.md)** —— 知道为什么最后一步会失败。
+读 **[C2 · 阻塞与失败记录](/blog/efml4a-c2-blockers/)** —— 知道为什么最后一步会失败。

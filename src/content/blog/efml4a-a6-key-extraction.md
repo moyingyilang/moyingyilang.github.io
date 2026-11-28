@@ -325,9 +325,9 @@ tools/.efml4a-bin/blcdump <新的.blc>
 你不公开它，别人也能自己找到 —— 而且找到了也做不了坏事。
 
 **我的做法：**
-- 在文档里写清楚来源（[CREDITS.md](../CREDITS.md) 感谢 Harry Huang 等人）
+- 在文档里写清楚来源（[CREDITS.md](https://github.com/moyingyilang/EFML4A/blob/main/CREDITS.md) 感谢 Harry Huang 等人）
 - 不把它当成「破解成果」炫耀
-- 同时强调合规边界（见 [SECURITY.md](../SECURITY.md)）
+- 同时强调合规边界（见 [SECURITY.md](https://github.com/moyingyilang/EFML4A/blob/main/SECURITY.md)）
 
 ---
 
@@ -349,4 +349,4 @@ tools/.efml4a-bin/blcdump <新的.blc>
 - ✅ 用 CRC32 验证密钥对不对
 - ✅ 知道 counter 那个坑
 
-接着读 **[A1 · VFS 存储格式](A1-vfs-storage.md)** —— 有了密钥就能读 `.blc` 了。
+接着读 **[A1 · VFS 存储格式](/blog/efml4a-a1-vfs-storage/)** —— 有了密钥就能读 `.blc` 了。

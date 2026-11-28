@@ -302,4 +302,4 @@ tools/.efml4a-bin/lz4invtest <file>
 - ✅ 知道「平均压缩率」和「精确匹配」的区别
 
 如果你想看这个「差 4.8%」导致的后果，读
-**[C2 · 阻塞与失败记录](C2-blockers.md)**。
+**[C2 · 阻塞与失败记录](/blog/efml4a-c2-blockers/)**。

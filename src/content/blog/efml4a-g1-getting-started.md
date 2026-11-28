@@ -263,7 +263,7 @@ pkg install clang zlib git
 ```
 
 **最后那一行就是整个项目卡住的地方。**
-细节在 [C2 · 阻塞与失败记录](C2-blockers.md)。
+细节在 [C2 · 阻塞与失败记录](/blog/efml4a-c2-blockers/)。
 
 ---
 
@@ -287,7 +287,7 @@ pkg install clang zlib git
 
 ### 「为什么文档里直接写了密钥？」
 
-**因为那是硬编码常量，不是机密。** 详见 [A6](A6-key-extraction.md) 第 8 节。
+**因为那是硬编码常量，不是机密。** 详见 [A6](/blog/efml4a-a6-key-extraction/) 第 8 节。
 
 **简单说：**
 - 它打在游戏二进制里，所有用户一样
@@ -306,7 +306,7 @@ pkg install clang zlib git
 
 ### 「为什么不用 Python？」
 
-**这个项目明确禁止 Python。** 见 [LANGUAGE.md](../LANGUAGE.md)。
+**这个项目明确禁止 Python。** 见 [LANGUAGE.md](https://github.com/moyingyilang/EFML4A/blob/main/LANGUAGE.md)。
 
 **理由：**
 - C 系工具可以直接编译成 Android 原生二进制
@@ -351,12 +351,12 @@ tools/.efml4a-bin/abverify bundle.ab
 
 ### 8.3 看归档
 
-[`archive/`](archive/) 里有 76 篇旧文档，是完整的实验流水账。
+[`archive/`](https://github.com/moyingyilang/EFML4A/tree/main/archive) 里有 76 篇旧文档，是完整的实验流水账。
 
 **里面有很多「试了但不行」的记录。** 如果你卡在某个地方，
 说不定我当年也卡过，翻翻可能有线索。
 
-**⚠️ 但要注意：** 归档里有 7 个结论后来被我推翻了（见 [F1](F1-history.md)）。
+**⚠️ 但要注意：** 归档里有 7 个结论后来被我推翻了（见 [F1](/blog/efml4a-f1-history/)）。
 
 ---
 
@@ -371,7 +371,7 @@ tools/.efml4a-bin/abverify bundle.ab
 看教训 → C2 → F1
 ```
 
-**如果你只有 10 分钟：** 读 [C2 的第 1 节](C2-blockers.md)。
+**如果你只有 10 分钟：** 读 [C2 的第 1 节](/blog/efml4a-c2-blockers/)。
 那是一个真实的技术故事 —— 所有东西都对，但就是一个字节的问题。
 
 ---

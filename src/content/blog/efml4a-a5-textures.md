@@ -175,7 +175,7 @@ $BIN/abverify /tmp/out.ab /dev/null 14768 /tmp/x.raw
 # 应该看到: ★ 目标区(14768,9792) 匹配=TRUE
 ```
 
-**到这里，文件就改好了。接下来是写回游戏 —— 见 [C1](C1-write-chain.md)。**
+**到这里，文件就改好了。接下来是写回游戏 —— 见 [C1](/blog/efml4a-c1-write-chain/)。**
 
 ---
 
@@ -218,4 +218,4 @@ $BIN/abverify /tmp/out.ab /dev/null 14768 /tmp/x.raw
 - ✅ 用 filesz 算出正确的流偏移
 - ✅ 把一张图编码成 ASTC 并打进 `.ab`
 
-接着读 **[C1 · 离线写入链路](C1-write-chain.md)** —— 把它写进游戏。
+接着读 **[C1 · 离线写入链路](/blog/efml4a-c1-write-chain/)** —— 把它写进游戏。

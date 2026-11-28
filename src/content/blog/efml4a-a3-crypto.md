@@ -229,7 +229,7 @@ su -c "../.efml4a-bin/ms <pid> <hex模式>"
 
 **⚠️ 合规说明：** 这些密钥是游戏二进制里的**硬编码常量**，
 属于**格式规范**而非机密。它们已经在公开的社区工具里出现多年。
-本项目在 [CREDITS.md](../CREDITS.md) 里注明了出处。
+本项目在 [CREDITS.md](https://github.com/moyingyilang/EFML4A/blob/main/CREDITS.md) 里注明了出处。
 
 ---
 
@@ -251,4 +251,4 @@ su -c "../.efml4a-bin/ms <pid> <hex模式>"
 - ✅ 理解对合加密为什么省事
 - ✅ 知道 ShiftRows 那个坑怎么避开
 
-接着读 **[A4 · 压缩体系](A4-compression.md)** —— 解密完之后，还有一层压缩。
+接着读 **[A4 · 压缩体系](/blog/efml4a-a4-compression/)** —— 解密完之后，还有一层压缩。
