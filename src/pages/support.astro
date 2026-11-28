@@ -74,6 +74,19 @@ const PROJECTS = [
 				<a class="btn btn--accent" href={AFDIAN_URL} target="_blank" rel="noopener noreferrer">前往爱发电</a>
 				<a class="btn btn--ghost" href="/about">了解本站</a>
 			</div>
+
+			<div class="support-wechat">
+				<h3>微信赞赏</h3>
+				<p>也可以直接扫下面的赞赏码；同样完全自愿，不影响任何功能。</p>
+				<img
+					class="support-qr"
+					src="/wechat-reward.png"
+					alt="微信赞赏码"
+					width="1382"
+					height="1382"
+					loading="lazy"
+				/>
+			</div>
 		</div>
 	</section>
 
@@ -98,6 +111,30 @@ const PROJECTS = [
 <style>
 	.support-actions {
 		margin-top: 1.1rem;
+	}
+
+	.support-wechat {
+		margin-top: 1.8rem;
+		padding-top: 1.4rem;
+		border-top: 1px solid var(--stroke);
+	}
+
+	.support-wechat h3 {
+		margin: 0 0 0.4rem;
+	}
+
+	.support-wechat p {
+		margin: 0 0 0.9rem;
+		color: var(--text-secondary);
+	}
+
+	.support-qr {
+		display: block;
+		width: min(100%, 240px);
+		height: auto;
+		border-radius: 12px;
+		border: 1px solid var(--stroke);
+		background: #111;
 	}
 
 	.support-foot {
